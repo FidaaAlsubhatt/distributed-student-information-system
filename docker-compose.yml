@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  global_db:
+    image: postgres:14
+    container_name: global_db
+    restart: always
+    environment:
+      POSTGRES_DB: global_sis
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpass
+    ports:
+      - "5435:5432"
+    volumes:
+      - global_data:/var/lib/postgresql/data
+      - ./docker/init/global_init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sis_network
+
+  cs_db:
+    image: postgres:14
+    container_name: cs_db
+    restart: always
+    environment:
+      POSTGRES_DB: cs_sis
+      POSTGRES_USER: cs_admin
+      POSTGRES_PASSWORD: cspass
+    ports:
+      - "5433:5432"
+    volumes:
+      - cs_data:/var/lib/postgresql/data
+      - ./docker/init/cs_init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sis_network
+
+  math_db:
+    image: postgres:14
+    container_name: math_db
+    restart: always
+    environment:
+      POSTGRES_DB: math_sis
+      POSTGRES_USER: math_admin
+      POSTGRES_PASSWORD: mathpass
+    ports:
+      - "5434:5432"
+    volumes:
+      - math_data:/var/lib/postgresql/data
+      - ./docker/init/math_init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sis_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - global_db
+      - cs_db
+      - math_db
+    networks:
+      - sis_network
+
+volumes:
+  global_data:
+  cs_data:
+  math_data:
+
+networks:
+  sis_network:
+

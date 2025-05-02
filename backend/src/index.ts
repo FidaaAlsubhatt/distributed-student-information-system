@@ -1,0 +1,29 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import './types/express';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+import express from 'express';
+import cors from 'cors';
+import * as authController from './controllers/authController';
+import dashboardRoutes from './dashboard/dashboard.routes';
+import adminUserRoutes from './admin/user.routes';
+import userRoutes from './routes/user.routes';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Auth routes
+app.post('/api/auth/login', authController.login);
+app.get('/api/auth/verify', authController.verifyToken);
+app.post('/api/auth/logout', authController.logout);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin/users', adminUserRoutes);
+app.use('/api', userRoutes);
+
+app.listen(process.env.PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
+});
+
