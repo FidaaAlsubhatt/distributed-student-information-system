@@ -1,123 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@/contexts/UserContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import TableList from '@/components/dashboard/TableList';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { 
-  PlusCircle, 
-  Pencil, 
-  Trash2, 
-  UserPlus,
-  User,
-  Shield,
-  Mail,
-  UserX,
-  Loader2,
-  GraduationCap,
-  BookOpen
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useUser } from '@/contexts/UserContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Pencil, Trash2, UserPlus, Mail, Shield, GraduationCap, BookOpen, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Mock data for users
-const users = [
-  {
-    id: '1',
-    name: 'Dr. Robert Chen',
-    email: 'rchen@university.edu',
-    role: 'Academic',
-    department: 'Computer Science',
-    position: 'Associate Professor',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  },
-  {
-    id: '2',
-    name: 'Prof. Sarah Johnson',
-    email: 'sjohnson@university.edu',
-    role: 'Academic',
-    department: 'Computer Science',
-    position: 'Professor',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  },
-  {
-    id: '3',
-    name: 'Dr. Michelle Wong',
-    email: 'mwong@university.edu',
-    role: 'Academic',
-    department: 'Computer Science',
-    position: 'Assistant Professor',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  },
-  {
-    id: '4',
-    name: 'Michael Johnson',
-    email: 'mjohnson@university.edu',
-    role: 'Student',
-    department: 'Computer Science',
-    position: '3rd Year Student',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  },
-  {
-    id: '5',
-    name: 'Emily Davis',
-    email: 'edavis@university.edu',
-    role: 'Student',
-    department: 'Computer Science',
-    position: '3rd Year Student',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  },
-  {
-    id: '6',
-    name: 'David Thompson',
-    email: 'dthompson@university.edu',
-    role: 'Department Admin',
-    department: 'Computer Science',
-    position: 'Department Administrator',
-    status: 'active',
-    avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-  }
-];
+// Define a type alias for the API UserData to avoid conflicts
+type DepartmentUserData = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  status: string;
+  avatar?: string;
+  studentNumber?: string;
+  yearOfStudy?: number;
+  staffId?: string;
+  position?: string;
+  universityEmail?: string;
+  departmentName?: string;
+  departmentId?: string;
+  createdAt: string;
+  roleScope: string;
+  fullName: string;
+}
 
-// Form schema for new user
 const userFormSchema = z.object({
   firstName: z.string().min(2, { message: "First name is required" }),
   lastName: z.string().min(2, { message: "Last name is required" }),
@@ -172,15 +99,6 @@ const userFormSchema = z.object({
 
 type FormValues = z.infer<typeof userFormSchema>;
 
-type AddressValues = {
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-};
-
 const ManageUsers: React.FC = () => {
   const { toast } = useToast();
   const { activeDepartment } = useUser();
@@ -188,22 +106,80 @@ const ManageUsers: React.FC = () => {
   const [currentTab, setCurrentTab] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
-  // Filter users based on search and tab
+  // State for API data
+  const [users, setUsers] = useState<DepartmentUserData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fetch users when component mounts or activeDepartment changes
+  useEffect(() => {
+    if (activeDepartment?.departmentCode) {
+      setIsLoading(true);
+      api.getDepartmentUsers(activeDepartment.departmentCode)
+        .then(data => {
+          console.log('Fetched department users:', data);
+          // Convert API data to our DepartmentUserData type
+          const departmentUsers: DepartmentUserData[] = (data || []).map((apiUser: any) => ({
+            id: apiUser.id,
+            firstName: apiUser.firstName || '',
+            lastName: apiUser.lastName || '',
+            email: apiUser.email || '',
+            role: apiUser.role || '',
+            status: apiUser.status || 'inactive',
+            avatar: apiUser.avatar,
+            studentNumber: apiUser.studentNumber,
+            yearOfStudy: apiUser.yearOfStudy,
+            staffId: apiUser.staffId,
+            position: apiUser.position,
+            universityEmail: apiUser.universityEmail,
+            departmentName: apiUser.departmentName,
+            departmentId: apiUser.departmentId,
+            createdAt: apiUser.createdAt || new Date().toISOString(),
+            roleScope: apiUser.roleScope || '',
+            fullName: `${apiUser.firstName || ''} ${apiUser.lastName || ''}`
+          }));
+          setUsers(departmentUsers);
+        })
+        .catch(err => {
+          console.error('Error fetching users:', err);
+          toast({
+            title: "Error",
+            description: "Failed to load users. Please try again.",
+            variant: "destructive"
+          });
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setUsers([]);
+      setIsLoading(false);
+    }
+  }, [activeDepartment, toast]);
+  
+  // Filter users based on search term and selected tab
   const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchTerm || 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.position.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesTab = 
-      currentTab === 'all' || 
-      (currentTab === 'academics' && user.role === 'Academic') ||
-      (currentTab === 'students' && user.role === 'Student') ||
-      (currentTab === 'admins' && user.role === 'Department Admin');
-    
-    return matchesSearch && matchesTab;
+    const matchesSearch = (
+      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (currentTab === 'all') {
+      return matchesSearch;
+    } else if (currentTab === 'academics') {
+      return matchesSearch && user.role === 'academic_staff';
+    } else if (currentTab === 'students') {
+      return matchesSearch && user.role === 'student';
+    } else if (currentTab === 'admins') {
+      return matchesSearch && user.role === 'department_admin';
+    }
+
+    return matchesSearch;
   });
   
+  // Create filtered lists for each tab
+  const academicStaff = users.filter(user => user.role === 'academic_staff');
+  const students = users.filter(user => user.role === 'student');
+  const departmentAdmins = users.filter(user => user.role === 'department_admin');
+
   // New user form
   const form = useForm<FormValues>({
     resolver: zodResolver(userFormSchema),
@@ -237,11 +213,11 @@ const ManageUsers: React.FC = () => {
     },
     mode: 'onChange',
   });
-  
+
   const [showStudentFields, setShowStudentFields] = useState(true);
   const [showAcademicFields, setShowAcademicFields] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Handle form submission for new user
   const onSubmit = async (data: FormValues) => {
     try {
@@ -253,31 +229,31 @@ const ManageUsers: React.FC = () => {
         });
         return;
       }
-      
+
       setIsSubmitting(true);
       console.log('Form data:', data);
-      
+
       if (data.role === 'student') {
         // Add student
         const studentData = {
           firstName: data.firstName,
           lastName: data.lastName,
+          email: data.personalEmail || '',  // Required by StudentFormData
+          role: 'student' as const,        // Required by StudentFormData
           dateOfBirth: data.dateOfBirth,
           gender: data.gender,
           personalEmail: data.personalEmail || undefined,
           personalPhone: data.personalPhone || undefined,
           address: data.address,
           studentNumber: data.studentNumber!,
-          universityEmail: `${data.studentNumber}@university.edu`,
-          phoneNumber: data.phoneNumber || undefined,
           yearOfStudy: data.yearOfStudy!,
-          password: data.password,
+          enrollmentDate: data.enrollmentDate || undefined,
           departmentId: activeDepartment.departmentId,
           departmentCode: activeDepartment.departmentCode,
         };
-        
-        const result = await api.addStudent(studentData);
-        
+
+        const result = await api.addStudent(studentData, activeDepartment.departmentCode);
+
         toast({
           title: "Student Added",
           description: `${data.firstName} ${data.lastName} has been added as a student. ID: ${result.userId}`,
@@ -302,19 +278,19 @@ const ManageUsers: React.FC = () => {
           departmentId: activeDepartment.departmentId,
           departmentCode: activeDepartment.departmentCode,
         };
-        
+
         // This would call the API to add academic staff
         // const result = await api.addAcademicStaff(academicData);
-        
+
         // For now, just log it since we haven't implemented the API
         console.log('Academic staff data:', academicData);
-        
+
         toast({
           title: "Academic Staff Added",
           description: `${data.firstName} ${data.lastName} has been added as academic staff.`,
         });
       }
-      
+
       setIsCreateDialogOpen(false);
       form.reset();
     } catch (error: any) {
@@ -328,18 +304,18 @@ const ManageUsers: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   // Handle user deletion
   const handleDeleteUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user) {
       toast({
         title: "User Removed",
-        description: `${user.name} has been removed successfully.`,
+        description: `${user.firstName} ${user.lastName} has been removed successfully.`,
       });
     }
   };
-  
+
   // Send password reset
   const handlePasswordReset = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -350,83 +326,105 @@ const ManageUsers: React.FC = () => {
       });
     }
   };
-  
+
   // Columns for users table
   const userColumns = [
     {
-      key: 'name',
+      id: 'user',
       header: 'User',
-      cell: (user: typeof users[0]) => (
+      cell: (user: DepartmentUserData) => (
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            {user.avatar ? (
+              <AvatarImage src={user.avatar} alt={`${user.firstName} ${user.lastName}`} />
+            ) : (
+              <AvatarFallback>{`${user.firstName.charAt(0)}${user.lastName.charAt(0)}`}</AvatarFallback>
+            )}
           </Avatar>
           <div>
-            <div className="font-medium text-gray-900">{user.name}</div>
+            <div className="font-medium text-gray-900">{`${user.firstName} ${user.lastName}`}</div>
             <div className="text-gray-500 text-sm">{user.email}</div>
           </div>
         </div>
       )
     },
     {
-      key: 'role',
+      id: 'role',
       header: 'Role',
-      cell: (user: typeof users[0]) => {
+      cell: (user: DepartmentUserData) => {
         let badgeClass = '';
-        
+        let roleDisplay = '';
+
         switch (user.role) {
-          case 'Academic':
+          case 'academic_staff':
             badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+            roleDisplay = 'Academic Staff';
             break;
-          case 'Student':
+          case 'student':
             badgeClass = 'bg-green-100 text-green-800 border-green-200';
+            roleDisplay = 'Student';
             break;
-          case 'Department Admin':
+          case 'department_admin':
             badgeClass = 'bg-purple-100 text-purple-800 border-purple-200';
+            roleDisplay = 'Department Admin';
             break;
+          default:
+            badgeClass = 'bg-gray-100 text-gray-800 border-gray-200';
+            roleDisplay = user.role || 'Unknown';
         }
-        
+
         return (
-          <Badge variant="outline" className={badgeClass}>
-            {user.role}
+          <Badge 
+            variant="outline" 
+            className={badgeClass}
+          >
+            {roleDisplay}
           </Badge>
         );
       }
     },
     {
-      key: 'position',
+      id: 'position',
       header: 'Position',
-      cell: (user: typeof users[0]) => (
-        <div className="text-gray-700">{user.position}</div>
-      )
+      cell: (user: DepartmentUserData) => {
+        let details = '';
+
+        if (user.role === 'academic_staff') {
+          details = user.position || 'N/A';
+        } else if (user.role === 'student') {
+          details = user.yearOfStudy ? `Year ${user.yearOfStudy} Student` : 'Student';
+        } else if (user.role === 'department_admin') {
+          details = 'Department Administrator';
+        }
+
+        return <div className="text-gray-700">{details}</div>;
+      }
     },
     {
-      key: 'department',
+      id: 'department',
       header: 'Department',
-      cell: (user: typeof users[0]) => (
-        <div className="text-gray-700">{user.department}</div>
+      cell: (_user: DepartmentUserData) => (
+        <div className="text-gray-700">{activeDepartment?.departmentName || 'N/A'}</div>
       )
     },
     {
-      key: 'status',
+      id: 'status',
       header: 'Status',
-      cell: (user: typeof users[0]) => (
+      cell: (user: DepartmentUserData) => (
         <Badge 
           variant="outline" 
           className={user.status === 'active' 
             ? 'bg-green-100 text-green-800 border-green-200' 
-            : 'bg-red-100 text-red-800 border-red-200'
-          }
+            : 'bg-gray-100 text-gray-800 border-gray-200'}
         >
-          {user.status === 'active' ? 'Active' : 'Inactive'}
+          {user.status || 'Unknown'}
         </Badge>
       )
     },
     {
-      key: 'actions',
+      id: 'actions',
       header: '',
-      cell: (user: typeof users[0]) => (
+      cell: (user: DepartmentUserData) => (
         <div className="flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -436,7 +434,7 @@ const ManageUsers: React.FC = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
+                <UserPlus className="mr-2 h-4 w-4" />
                 <span>View Profile</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
@@ -447,12 +445,11 @@ const ManageUsers: React.FC = () => {
                 <Shield className="mr-2 h-4 w-4" />
                 <span>Reset Password</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 className="text-red-600"
                 onClick={() => handleDeleteUser(user.id)}
               >
-                <UserX className="mr-2 h-4 w-4" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 <span>Remove User</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -962,7 +959,7 @@ const ManageUsers: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                {users.filter(user => user.role === 'Academic').length}
+                {users.filter(user => user.role === 'academic_staff').length}
               </div>
               <p className="text-sm text-gray-500">Professors & lecturers</p>
             </CardContent>
@@ -974,7 +971,7 @@ const ManageUsers: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {users.filter(user => user.role === 'Student').length}
+                {users.filter(user => user.role === 'student').length}
               </div>
               <p className="text-sm text-gray-500">Enrolled students</p>
             </CardContent>
@@ -986,7 +983,7 @@ const ManageUsers: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-600">
-                {users.filter(user => user.role === 'Department Admin').length}
+                {users.filter(user => user.role === 'department_admin').length}
               </div>
               <p className="text-sm text-gray-500">Department admins</p>
             </CardContent>
@@ -997,11 +994,10 @@ const ManageUsers: React.FC = () => {
         <div>
           <Tabs defaultValue="all" value={currentTab} onValueChange={setCurrentTab}>
             <div className="flex items-center justify-between mb-4">
-              <TabsList>
+                <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="all">All Users</TabsTrigger>
                 <TabsTrigger value="academics">Academic Staff</TabsTrigger>
                 <TabsTrigger value="students">Students</TabsTrigger>
-                <TabsTrigger value="admins">Administrators</TabsTrigger>
               </TabsList>
               
               <div className="relative w-64">
@@ -1015,32 +1011,111 @@ const ManageUsers: React.FC = () => {
             </div>
             
             <TabsContent value="all" className="m-0">
-              <TableList 
-                columns={userColumns}
-                data={filteredUsers}
-              />
+              <div className="rounded-md border overflow-hidden">
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Table header */}
+                    <div className="grid grid-cols-5 gap-4 bg-muted/50 p-4 font-medium">
+                      <div>User</div>
+                      <div>Role</div>
+                      <div>Position</div>
+                      <div>Status</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+                    {/* Table rows */}
+                    <div className="divide-y">
+                      {filteredUsers.map((user: DepartmentUserData) => (
+                        <div key={user.id} className="grid grid-cols-5 gap-4 p-4 items-center hover:bg-muted/50 transition-colors">
+                          {userColumns[0].cell(user)}
+                          {userColumns[1].cell(user)}
+                          {userColumns[2].cell(user)}
+                          {userColumns[3].cell(user)}
+                          <div className="flex justify-end">
+                            {userColumns[4].cell(user)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </TabsContent>
             
             <TabsContent value="academics" className="m-0">
-              <TableList 
-                columns={userColumns}
-                data={filteredUsers}
-              />
+              <div className="rounded-md border overflow-hidden">
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Table header */}
+                    <div className="grid grid-cols-5 gap-4 bg-muted/50 p-4 font-medium">
+                      <div>User</div>
+                      <div>Role</div>
+                      <div>Position</div>
+                      <div>Status</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+                    {/* Table rows */}
+                    <div className="divide-y">
+                      {academicStaff.map((user: DepartmentUserData) => (
+                        <div key={user.id} className="grid grid-cols-5 gap-4 p-4 items-center hover:bg-muted/50 transition-colors">
+                          {userColumns[0].cell(user)}
+                          {userColumns[1].cell(user)}
+                          {userColumns[2].cell(user)}
+                          {userColumns[3].cell(user)}
+                          <div className="flex justify-end">
+                            {userColumns[4].cell(user)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </TabsContent>
             
             <TabsContent value="students" className="m-0">
-              <TableList 
-                columns={userColumns}
-                data={filteredUsers}
-              />
+              <div className="rounded-md border overflow-hidden">
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div>
+                    {/* Table header */}
+                    <div className="grid grid-cols-5 gap-4 bg-muted/50 p-4 font-medium">
+                      <div>User</div>
+                      <div>Role</div>
+                      <div>Position</div>
+                      <div>Status</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+                    {/* Table rows */}
+                    <div className="divide-y">
+                      {students.map((user: DepartmentUserData) => (
+                        <div key={user.id} className="grid grid-cols-5 gap-4 p-4 items-center hover:bg-muted/50 transition-colors">
+                          {userColumns[0].cell(user)}
+                          {userColumns[1].cell(user)}
+                          {userColumns[2].cell(user)}
+                          {userColumns[3].cell(user)}
+                          <div className="flex justify-end">
+                            {userColumns[4].cell(user)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </TabsContent>
             
-            <TabsContent value="admins" className="m-0">
-              <TableList 
-                columns={userColumns}
-                data={filteredUsers}
-              />
-            </TabsContent>
+
           </Tabs>
         </div>
       </div>
