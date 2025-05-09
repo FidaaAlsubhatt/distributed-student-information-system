@@ -2,7 +2,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import './types/express';
 
+console.log('Loading .env from:', path.resolve(__dirname, '../.env'));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+console.log('PORT from .env:', process.env.PORT);
 
 import express from 'express';
 import cors from 'cors';
@@ -23,7 +25,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin/users', adminUserRoutes);
 app.use('/api', userRoutes);
 
-app.listen(process.env.PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${process.env.PORT}`);
+const port = process.env.PORT || 3001;
+console.log('Using PORT:', port);
+app.listen(port, () => {
+  console.log(`🚀 Server running at http://localhost:${port}`);
 });
 

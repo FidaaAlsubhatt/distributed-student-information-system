@@ -27,7 +27,12 @@ export interface UserData {
 }
 
 // Define API request function
-const apiRequest = async <T>(method: string, url: string, data?: any): Promise<T> => {
+const apiRequest = async <T>(
+  method: string, 
+  url: string, 
+  data?: any, 
+  departmentCode?: string | null
+): Promise<T> => {
   // Get token from localStorage
   const authData = localStorage.getItem('auth');
   const token = authData ? JSON.parse(authData).token : null;
@@ -39,11 +44,16 @@ const apiRequest = async <T>(method: string, url: string, data?: any): Promise<T
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+
+  // Add department code header if provided
+  if (departmentCode) {
+    headers['x-schema-prefix'] = departmentCode; // Consider renaming to x-department-code
+  }
   
   try {
     const response = await axios({
       method,
-      url: `http://localhost:3001${url}`,
+      url: url,
       data,
       headers,
     });
@@ -143,11 +153,13 @@ export const api = {
     phoneNumber?: string;
     yearOfStudy: number;
     password: string;
+    departmentId: string; 
+    departmentCode: string; 
   }) => {
     return apiRequest<any>('POST', '/api/department/students', studentData);
   },
 
-  getStudents: async () => {
-    return apiRequest<any[]>('GET', '/api/department/students');
+  getStudents: async (departmentCode: string) => {
+    return apiRequest<any[]>('GET', '/api/department/students', undefined, departmentCode);
   }
 };

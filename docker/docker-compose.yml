@@ -1,10 +1,7 @@
-version: '3.8'
-
 services:
   global_db:
     image: postgres:14
     container_name: global_db
-    restart: always
     environment:
       POSTGRES_DB: global_sis
       POSTGRES_USER: admin
@@ -13,14 +10,13 @@ services:
       - "5435:5432"
     volumes:
       - global_data:/var/lib/postgresql/data
-      - ./docker/init/global_init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init/global:/docker-entrypoint-initdb.d:ro
     networks:
       - sis_network
 
   cs_db:
     image: postgres:14
     container_name: cs_db
-    restart: always
     environment:
       POSTGRES_DB: cs_sis
       POSTGRES_USER: cs_admin
@@ -29,14 +25,13 @@ services:
       - "5433:5432"
     volumes:
       - cs_data:/var/lib/postgresql/data
-      - ./docker/init/cs_init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init/cs:/docker-entrypoint-initdb.d:ro
     networks:
       - sis_network
 
   math_db:
     image: postgres:14
     container_name: math_db
-    restart: always
     environment:
       POSTGRES_DB: math_sis
       POSTGRES_USER: math_admin
@@ -45,7 +40,7 @@ services:
       - "5434:5432"
     volumes:
       - math_data:/var/lib/postgresql/data
-      - ./docker/init/math_init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init/math:/docker-entrypoint-initdb.d:ro
     networks:
       - sis_network
 
@@ -71,4 +66,3 @@ volumes:
 
 networks:
   sis_network:
-

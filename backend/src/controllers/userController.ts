@@ -14,7 +14,7 @@ export const createUser = async (req: Request, res: Response) => {
 
     // Check if email already exists
     const existingUser = await pool.query(
-      'SELECT * FROM public.users WHERE email = $1',
+      'SELECT * FROM central.users WHERE email = $1',
       [email]
     );
 
@@ -36,13 +36,13 @@ export const createUser = async (req: Request, res: Response) => {
 
       // Insert the user
       await client.query(
-        'INSERT INTO public.users (user_id, email, password_hash, status, created_at) VALUES ($1, $2, $3, $4, NOW())',
+        'INSERT INTO central.users (user_id, email, password_hash, status, created_at) VALUES ($1, $2, $3, $4, NOW())',
         [userId, email, passwordHash, 'active']
       );
 
       // Insert user profile
       await client.query(
-        'INSERT INTO public.user_profiles (user_id, first_name, last_name, timezone) VALUES ($1, $2, $3, $4)',
+        'INSERT INTO central.user_profiles (user_id, first_name, last_name, timezone) VALUES ($1, $2, $3, $4)',
         [userId, firstName, lastName, 'UTC']
       );
 
@@ -52,14 +52,14 @@ export const createUser = async (req: Request, res: Response) => {
       
       if (role === 'central_admin') {
         const roleResult = await client.query(
-          'SELECT role_id, scope FROM public.roles WHERE name = $1',
+          'SELECT role_id, scope FROM central.roles WHERE name = $1',
           ['central_admin']
         );
         roleId = roleResult.rows[0].role_id;
         roleScope = roleResult.rows[0].scope;
       } else if (role === 'department_admin') {
         const roleResult = await client.query(
-          'SELECT role_id, scope FROM public.roles WHERE name = $1',
+          'SELECT role_id, scope FROM central.roles WHERE name = $1',
           ['department_admin']
         );
         roleId = roleResult.rows[0].role_id;
@@ -71,7 +71,7 @@ export const createUser = async (req: Request, res: Response) => {
 
       // Assign global role
       await client.query(
-        'INSERT INTO public.user_roles (user_id, role_id, assigned_at) VALUES ($1, $2, NOW())',
+        'INSERT INTO central.user_roles (user_id, role_id, assigned_at) VALUES ($1, $2, NOW())',
         [userId, roleId]
       );
 
@@ -79,7 +79,7 @@ export const createUser = async (req: Request, res: Response) => {
       if (role === 'department_admin' && departmentId) {
         // Check if department exists
         const deptResult = await client.query(
-          'SELECT * FROM public.departments WHERE dept_id = $1',
+          'SELECT * FROM central.departments WHERE dept_id = $1',
           [departmentId]
         );
 
@@ -90,7 +90,7 @@ export const createUser = async (req: Request, res: Response) => {
 
         // Assign department role
         await client.query(
-          'INSERT INTO public.user_department_roles (user_id, dept_id, role_id, assigned_at) VALUES ($1, $2, $3, NOW())',
+          'INSERT INTO central.user_department (user_id, dept_id, role_id, assigned_at) VALUES ($1, $2, $3, NOW())',
           [userId, departmentId, roleId]
         );
       }
@@ -126,10 +126,10 @@ export const getUsers = async (req: Request, res: Response) => {
       SELECT u.user_id, u.email, u.status, u.created_at,
              p.first_name, p.last_name, p.phone, p.office, p.timezone,
              r.name as role_name, r.scope as role_scope
-      FROM public.users u
-      JOIN public.user_profiles p ON u.user_id = p.user_id
-      JOIN public.user_roles ur ON u.user_id = ur.user_id
-      JOIN public.roles r ON ur.role_id = r.role_id
+      FROM central.users u
+      JOIN central.user_profiles p ON u.user_id = p.user_id
+      JOIN central.user_roles ur ON u.user_id = ur.user_id
+      JOIN central.roles r ON ur.role_id = r.role_id
       ORDER BY u.created_at DESC
     `);
 
@@ -161,7 +161,7 @@ export const getDepartments = async (req: Request, res: Response) => {
     // Get all departments
     const departmentsResult = await pool.query(`
       SELECT dept_id, name, host, port, dbname, schema_prefix, status, contact_email
-      FROM public.departments
+      FROM central.departments
       ORDER BY name ASC
     `);
 

@@ -47,7 +47,7 @@ export const login = async (req: Request, res: Response) => {
     // Get user from database
     console.log('Querying database for user:', email);
     const userResult = await pool.query(
-      'SELECT * FROM public.users WHERE email ILIKE $1',
+      'SELECT * FROM central.users WHERE email ILIKE $1',
       [email]
     );
 
@@ -89,7 +89,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Get user profile
     const profileResult = await pool.query(
-      'SELECT * FROM public.user_profiles WHERE user_id = $1',
+      'SELECT * FROM central.user_profiles WHERE user_id = $1',
       [user.user_id]
     );
     const profile: UserProfile = profileResult.rows[0];
@@ -97,8 +97,8 @@ export const login = async (req: Request, res: Response) => {
     // Get user's roles
     const rolesResult = await pool.query(
       `SELECT ur.user_id, ur.role_id, r.name as role_name, r.scope as role_scope 
-       FROM public.user_roles ur
-       JOIN public.roles r ON ur.role_id = r.role_id
+       FROM central.user_roles ur
+       JOIN central.roles r ON ur.role_id = r.role_id
        WHERE ur.user_id = $1`,
       [user.user_id]
     );
@@ -108,9 +108,9 @@ export const login = async (req: Request, res: Response) => {
     const deptRolesResult = await pool.query(
       `SELECT udr.user_id, udr.dept_id, udr.role_id, r.name as role_name, 
               d.name as dept_name, d.schema_prefix
-       FROM public.user_department_roles udr
-       JOIN public.roles r ON udr.role_id = r.role_id
-       JOIN public.departments d ON udr.dept_id = d.dept_id
+       FROM central.user_department udr
+       JOIN central.roles r ON udr.role_id = r.role_id
+       JOIN central.departments d ON udr.dept_id = d.dept_id
        WHERE udr.user_id = $1`,
       [user.user_id]
     );
@@ -170,7 +170,7 @@ export const verifyToken = async (req: Request, res: Response) => {
     
     // Get user from database to ensure they still exist and are active
     const userResult = await pool.query(
-      'SELECT * FROM public.users WHERE user_id = $1',
+      'SELECT * FROM central.users WHERE user_id = $1',
       [decoded.userId]
     );
 

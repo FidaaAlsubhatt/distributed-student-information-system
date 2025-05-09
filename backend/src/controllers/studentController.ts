@@ -43,13 +43,12 @@ export const addStudent = async (req: Request, res: Response) => {
     // by checking the JWT token claims against the provided departmentId
     // For now, we'll trust the frontend validation
     
-    // Use the department code as the schema prefix
-    const schemaPrefix = departmentCode;
+    // Get the department-specific pool
+    const deptPool = await getDepartmentPool(departmentCode);
 
     // Check if student number already exists in department
-    const deptPool = getDepartmentPool(schemaPrefix);
     const existingStudent = await deptPool.query(
-      `SELECT * FROM ${schemaPrefix}.students WHERE student_number = $1`,
+      `SELECT * FROM students WHERE student_number = $1`,
       [studentNumber]
     );
 
@@ -59,7 +58,7 @@ export const addStudent = async (req: Request, res: Response) => {
 
     // Check if university email already exists
     const existingEmail = await deptPool.query(
-      `SELECT * FROM ${schemaPrefix}.students WHERE university_email = $1`,
+      `SELECT * FROM students WHERE university_email = $1`,
       [universityEmail]
     );
 
@@ -81,7 +80,7 @@ export const addStudent = async (req: Request, res: Response) => {
 
       // Insert address
       const addressResult = await deptClient.query(
-        `INSERT INTO ${schemaPrefix}.addresses 
+        `INSERT INTO addresses 
          (address_id, line1, line2, city, state, postal_code, country, created_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
          RETURNING address_id`,
@@ -100,7 +99,7 @@ export const addStudent = async (req: Request, res: Response) => {
 
       // Insert user profile
       await deptClient.query(
-        `INSERT INTO ${schemaPrefix}.user_profiles 
+        `INSERT INTO user_profiles 
          (user_id, first_name, last_name, date_of_birth, gender, personal_email, personal_phone, address_id) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
@@ -117,7 +116,7 @@ export const addStudent = async (req: Request, res: Response) => {
 
       // Insert student record
       await deptClient.query(
-        `INSERT INTO ${schemaPrefix}.students 
+        `INSERT INTO students 
          (student_id, user_id, student_number, university_email, phone_number, year_of_study, enrolment_date, status) 
          VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)`,
         [
@@ -133,7 +132,7 @@ export const addStudent = async (req: Request, res: Response) => {
 
       // Insert into outbox for central DB provisioning
       await deptClient.query(
-        `INSERT INTO ${schemaPrefix}.outbox 
+        `INSERT INTO outbox 
          (event_id, event_type, payload, created_at) 
          VALUES ($1, $2, $3, NOW())`,
         [
@@ -178,18 +177,18 @@ export const addStudent = async (req: Request, res: Response) => {
 // Get all students in a department
 export const getStudents = async (req: Request, res: Response) => {
   try {
-    // Get department schema from user's token
-    const schemaPrefix = req.headers['x-schema-prefix'] as string || 'dept1';
+    // Get department code from header (e.g., 'cs', 'math')
+    const departmentCode = req.headers['x-schema-prefix'] as string || 'dept1'; // TODO: Consider renaming header to x-department-code
     
-    const deptPool = getDepartmentPool(schemaPrefix);
+    const deptPool = await getDepartmentPool(departmentCode);
     
     // Get all students with their profiles
     const studentsResult = await deptPool.query(`
       SELECT s.student_id, s.student_number, s.university_email, s.phone_number, 
              s.year_of_study, s.enrolment_date, s.status,
              p.first_name, p.last_name, p.date_of_birth, p.gender
-      FROM ${schemaPrefix}.students s
-      JOIN ${schemaPrefix}.user_profiles p ON s.user_id = p.user_id
+      FROM students s
+      JOIN user_profiles p ON s.user_id = p.user_id
       ORDER BY s.enrolment_date DESC
     `);
 
