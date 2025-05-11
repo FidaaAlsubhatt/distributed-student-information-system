@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { api, UserRole, DepartmentRole, UserData } from '../lib/api';
+import { api, DepartmentRole, UserData } from '../lib/api';
 import { useLocation } from 'wouter';
 
 interface User {
@@ -47,19 +47,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // Set current user
         setCurrentUser({
-          id: authData.userId,
-          username: authData.username,
-          email: authData.email,
-          roles: authData.roles,
-          departmentRoles: authData.departmentRoles
+          id: authData.userId || '',
+          username: authData.username || '',
+          email: authData.universityEmail || '',  // Use universityEmail instead of email
+          roles: authData.roles || [],
+          departmentRoles: authData.departmentRoles || []
         });
         
         // Set available roles
-        const roleNames = authData.roles.map(role => role.name);
+        const roleNames = authData.roles ? authData.roles.map(role => role.name) : [];
         setAvailableRoles(roleNames);
         
         // Set available departments
-        setAvailableDepartments(authData.departmentRoles);
+        setAvailableDepartments(authData.departmentRoles || []);
         
         // Set active role (default to first role)
         if (roleNames.length > 0 && !activeRole) {
@@ -67,7 +67,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         
         // Set active department (default to first department)
-        if (authData.departmentRoles.length > 0 && !activeDepartment) {
+        if (authData.departmentRoles && authData.departmentRoles.length > 0 && !activeDepartment) {
           setActiveDepartment(authData.departmentRoles[0]);
         }
         
@@ -86,19 +86,19 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // Set current user
       setCurrentUser({
-        id: authData.userId,
-        username: authData.username,
-        email: authData.email,
-        roles: authData.roles,
-        departmentRoles: authData.departmentRoles
+        id: authData.userId || '',
+        username: authData.username || '',
+        email: authData.universityEmail || '',  // Use universityEmail instead of email
+        roles: authData.roles || [],
+        departmentRoles: authData.departmentRoles || []
       });
       
       // Set available roles
-      const roleNames = authData.roles.map(role => role.name);
+      const roleNames = authData.roles ? authData.roles.map(role => role.name) : [];
       setAvailableRoles(roleNames);
       
       // Set available departments
-      setAvailableDepartments(authData.departmentRoles);
+      setAvailableDepartments(authData.departmentRoles || []);
       
       // Set active role (default to first role)
       let firstRole = '';
@@ -108,7 +108,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       // Set active department (default to first department)
-      if (authData.departmentRoles.length > 0) {
+      if (authData.departmentRoles && authData.departmentRoles.length > 0) {
         setActiveDepartment(authData.departmentRoles[0]);
       }
       

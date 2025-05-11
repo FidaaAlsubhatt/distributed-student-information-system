@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Pencil, Trash2, UserPlus, Mail, Shield, GraduationCap, BookOpen, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import TableList from '@/components/dashboard/TableList';
 
 // Define a type alias for the API UserData to avoid conflicts
 type DepartmentUserData = {
@@ -400,13 +401,13 @@ const ManageUsers: React.FC = () => {
         return <div className="text-gray-700">{details}</div>;
       }
     },
-    {
-      id: 'department',
-      header: 'Department',
-      cell: (_user: DepartmentUserData) => (
-        <div className="text-gray-700">{activeDepartment?.departmentName || 'N/A'}</div>
-      )
-    },
+    //{
+    //   id: 'department',
+    //   header: 'Department',
+    //   cell: (_user: DepartmentUserData) => (
+    //     <div className="text-gray-700">{activeDepartment?.departmentName || 'N/A'}</div>
+    //   )
+    // },
     {
       id: 'status',
       header: 'Status',
