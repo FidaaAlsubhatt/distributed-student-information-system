@@ -10,7 +10,7 @@ END
 $$;
 
 -- GRANT database-level access
-GRANT CONNECT ON DATABASE current_database() TO fdw_central_reader;
+GRANT CONNECT ON DATABASE cs_sis TO fdw_central_reader;
 
 -- GRANT schema-level access
 GRANT USAGE ON SCHEMA cs_schema TO fdw_central_reader;
