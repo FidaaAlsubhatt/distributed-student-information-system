@@ -76,6 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
           },
           { name: 'Reports', icon: 'fa-solid fa-chart-line', id: '/reports' },
         ];
+      case 'academic_staff':
       case 'academic':
         return [
           { name: 'Overview', icon: 'fa-solid fa-gauge-high', id: '/academic/dashboard' },
