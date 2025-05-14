@@ -47,7 +47,22 @@ export const getStudentModules = async (req: Request, res: Response) => {
     }
     
     const { local_user_id, schema_prefix } = mapResult.rows[0];
-    const deptPool = await getDepartmentPool(schema_prefix);
+    
+    // Get department-specific database connection with proper error handling
+    let deptPool;
+    try {
+      deptPool = await getDepartmentPool(schema_prefix);
+      console.log(`Connected to ${schema_prefix} database successfully for modules`);
+    } catch (error) {
+      console.error(`Failed to connect to ${schema_prefix} database:`, error);
+      return res.status(503).json({ message: `${schema_prefix} database unavailable` });
+    }
+    
+    // First check if student exists and has enrollments
+    const enrollmentCheckResult = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Student enrollments:', enrollmentCheckResult.rows[0].count);
     
     // Get modules with UK terminology - match the actual database schema
     const modulesResult = await deptPool.query(`
@@ -80,7 +95,13 @@ export const getStudentModules = async (req: Request, res: Response) => {
       ORDER BY s.start_date DESC
     `, [local_user_id]);
     
-    return res.status(200).json(modulesResult.rows);
+    console.log(`Found ${modulesResult.rows.length} modules for student in ${schema_prefix}`);
+    
+    // Return modules with department information
+    return res.status(200).json({
+      modules: modulesResult.rows,
+      department: schema_prefix
+    });
   } catch (error) {
     console.error('Error fetching student modules:', error);
     return res.status(500).json({ message: 'Internal server error' });

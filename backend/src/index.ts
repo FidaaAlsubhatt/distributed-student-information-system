@@ -16,6 +16,7 @@ import userRoutes from './routes/user.routes';
 import moduleRoutes from './routes/module.routes';
 import assignmentRoutes from './routes/assignment.routes';
 import profileRoutes from './routes/profile.routes';
+import timetableRoutes from './routes/timetable.routes';
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,7 @@ app.use('/api/admin/users', adminUserRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/timetable', timetableRoutes);
 app.use('/api', userRoutes);
 
 const port = process.env.PORT || 3001;

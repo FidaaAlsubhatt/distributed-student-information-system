@@ -52,6 +52,7 @@ const Timetable: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [classTimetableEntries, setClassTimetableEntries] = useState<ClassSession[]>([]);
   const [examTimetableEntries, setExamTimetableEntries] = useState<ExamSession[]>([]);
+  const [department, setDepartment] = useState<string>('');
   
   // Check if we're on the exam timetable page
   const isExamTimetable = location === '/exam-timetable';
@@ -108,6 +109,15 @@ const Timetable: React.FC = () => {
           }
         });
         
+        console.log('Class timetable response:', classResponse.data);
+        setClassTimetableEntries(classResponse.data.classes || []);
+        
+        // Store department info from class response
+        if (classResponse.data.department) {
+          setDepartment(classResponse.data.department);
+          console.log('Department from class API:', classResponse.data.department);
+        }
+        
         // Fetch exam timetable data
         const examResponse = await axios.get('/api/timetable/exams', {
           headers: {
@@ -116,8 +126,15 @@ const Timetable: React.FC = () => {
           }
         });
         
-        setClassTimetableEntries(classResponse.data.classes || []);
+        console.log('Exam timetable response:', examResponse.data);
         setExamTimetableEntries(examResponse.data.exams || []);
+        
+        // If department wasn't set from class response, try from exam response
+        if (!department && examResponse.data.department) {
+          setDepartment(examResponse.data.department);
+          console.log('Department from exam API:', examResponse.data.department);
+        }
+        
         setLoading(false);
       } catch (err) {
         console.error('Error fetching timetable data:', err);
@@ -229,9 +246,16 @@ const Timetable: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isExamTimetable ? 'Exam Timetable' : 'Class Timetable'}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight">
+              {isExamTimetable ? 'Exam Timetable' : 'Class Timetable'}
+            </h1>
+            {department && (
+              <Badge className="capitalize bg-blue-100 text-blue-800">
+                {department.replace('_schema', '')} Department
+              </Badge>
+            )}
+          </div>
           
           <div className="flex space-x-2">
             <Button 

@@ -51,7 +51,15 @@ export const getStudentClassTimetable = async (req: Request, res: Response) => {
     }
     
     const { local_user_id, schema_prefix } = mapResult.rows[0];
-    const deptPool = await getDepartmentPool(schema_prefix);
+    // Get department-specific database connection
+    let deptPool;
+    try {
+      deptPool = await getDepartmentPool(schema_prefix);
+      console.log(`Connected to ${schema_prefix} database successfully`);
+    } catch (error) {
+      console.error(`Failed to connect to ${schema_prefix} database:`, error);
+      return res.status(503).json({ message: `${schema_prefix} database unavailable` });
+    }
     
     // First check if we have any timetable entries at all (for debugging)
     const timetableCheckResult = await deptPool.query(`
@@ -116,7 +124,11 @@ export const getStudentClassTimetable = async (req: Request, res: Response) => {
       type: session.type
     }));
     
-    return res.status(200).json({ classes: formattedTimetable });
+    // Include department info in the response for frontend to display
+    return res.status(200).json({ 
+      classes: formattedTimetable,
+      department: schema_prefix 
+    });
   } catch (error) {
     console.error('Error fetching student class timetable:', error);
     return res.status(500).json({ message: 'Internal server error' });
@@ -164,7 +176,15 @@ export const getStudentExamTimetable = async (req: Request, res: Response) => {
     }
     
     const { local_user_id, schema_prefix } = mapResult.rows[0];
-    const deptPool = await getDepartmentPool(schema_prefix);
+    // Get department-specific database connection
+    let deptPool;
+    try {
+      deptPool = await getDepartmentPool(schema_prefix);
+      console.log(`Connected to ${schema_prefix} database successfully`);
+    } catch (error) {
+      console.error(`Failed to connect to ${schema_prefix} database:`, error);
+      return res.status(503).json({ message: `${schema_prefix} database unavailable` });
+    }
     
     // First check if we have any exam entries (for debugging)
     const examCheckResult = await deptPool.query(`
@@ -229,7 +249,11 @@ export const getStudentExamTimetable = async (req: Request, res: Response) => {
       console.log('First formatted exam:', formattedExams[0]);
     }
     
-    return res.status(200).json({ exams: formattedExams });
+    // Include department info in the response for frontend to display
+    return res.status(200).json({ 
+      exams: formattedExams,
+      department: schema_prefix 
+    });
   } catch (error) {
     console.error('Error fetching student exam timetable:', error);
     return res.status(500).json({ message: 'Internal server error' });

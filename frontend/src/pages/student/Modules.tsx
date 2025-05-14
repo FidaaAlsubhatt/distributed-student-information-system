@@ -30,6 +30,7 @@ const Modules: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('All Semesters');
   const [currentPage, setCurrentPage] = useState(1);
+  const [department, setDepartment] = useState<string>('');
   const itemsPerPage = 5;
 
   // Fetch modules using email-based approach
@@ -71,8 +72,19 @@ const Modules: React.FC = () => {
         
         console.log('API response:', response.data);
         
-        // Set the modules from the API response
-        setModules(response.data);
+        console.log('Module API full response:', response.data);
+        
+        // Handle the new response format which includes department info
+        if (response.data.modules) {
+          setModules(response.data.modules);
+          if (response.data.department) {
+            setDepartment(response.data.department);
+            console.log('Department from modules API:', response.data.department);
+          }
+        } else {
+          // Backward compatibility with old API format
+          setModules(response.data);
+        }
         
       } catch (err) {
         console.error('Error fetching modules:', err);
@@ -86,7 +98,12 @@ const Modules: React.FC = () => {
   }, [isAuthenticated]);
   
   // Split modules into active and completed
-  const activeModules = modules.filter(module => module.status.toLowerCase() === 'active');
+  // Include both active and registered modules as current modules
+  const activeModules = modules.filter(module => 
+    module.status.toLowerCase() === 'active' ||
+    module.status.toLowerCase() === 'registered' ||
+    module.status.toLowerCase() === 'enrolled'
+  );
   const pastModules = modules.filter(module => module.status.toLowerCase() === 'completed' || 
                                             module.status.toLowerCase() === 'passed' ||
                                             module.grade !== 'Not Graded');
@@ -220,7 +237,14 @@ const Modules: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">My Modules</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-800">My Modules</h2>
+            {department && (
+              <Badge className="capitalize bg-blue-100 text-blue-800">
+                {department.replace('_schema', '')} Department
+              </Badge>
+            )}
+          </div>
           <Link href="/request-enrollment">
             <Button className="flex items-center gap-2">
               <span className="text-lg">+</span> Request Enrollment
@@ -279,16 +303,6 @@ const Modules: React.FC = () => {
         
         )}
         
-        {/* Past Modules */}
-        {!loading && !error && pastModules.length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Past Modules</h3>
-            <TableList
-              columns={pastModulesColumns}
-              data={pastModules}
-            />
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
