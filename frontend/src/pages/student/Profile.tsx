@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,9 +7,9 @@ import {
   Card, 
   CardContent, 
   CardDescription, 
-  CardFooter, 
   CardHeader, 
-  CardTitle 
+  CardTitle,
+  CardFooter 
 } from '@/components/ui/card';
 import {
   Tabs,
@@ -32,122 +32,187 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/contexts/UserContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Upload, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import axios from 'axios';
 
+// Define interfaces for our profile data
+interface StudentAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  county: string;  // UK-specific terminology
+  postalCode: string;  // UK-specific terminology
+  country: string;
+}
+
+interface AcademicInfo {
+  studentNumber: string;
+  department: string;
+  year: number;
+  enrollDate: string;
+  status: string;
+}
+
+interface EmergencyContact {
+  name: string;
+  relation: string;
+  phone: string;
+}
+
+interface StudentProfile {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  personalEmail: string;
+  phone: string;
+  address: StudentAddress;
+  dateOfBirth: string;
+  gender: string;
+  nationality: string;
+  academicInfo: AcademicInfo;
+  emergencyContact: EmergencyContact;
+  avatar: string;
+}
+
+const defaultProfile: StudentProfile = {
+  id: '',
+  name: '',
+  username: '',
+  email: '',
+  personalEmail: '',
+  phone: '',
+  address: {
+    line1: '',
+    line2: '',
+    city: '',
+    county: '',
+    postalCode: '',
+    country: 'United Kingdom'
+  },
+  dateOfBirth: '',
+  gender: '',
+  nationality: '',
+  academicInfo: {
+    studentNumber: '',
+    department: '',
+    year: 1,
+    enrollDate: '',
+    status: ''
+  },
+  emergencyContact: {
+    name: '',
+    relation: '',
+    phone: ''
+  },
+  avatar: ''
+};
+
+// Form schemas
 const profileFormSchema = z.object({
-  name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
   phone: z.string().min(10, {
     message: "Phone number must be at least 10 digits.",
   }).optional(),
-  address: z.string().min(5, {
-    message: "Address must be at least 5 characters.",
+  personalEmail: z.string().email({
+    message: "Please enter a valid email address.",
   }).optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  postalCode: z.string().optional(),
-  bio: z.string().optional(),
-});
-
-const documentsFormSchema = z.object({
-  documentType: z.string().min(1, {
-    message: "Please select a document type.",
-  }),
-  documentFile: z.custom<FileList>()
-    .refine(files => files.length > 0, {
-      message: "Please upload a file.",
-    })
-    .refine(files => Array.from(files).every(file => file.size <= 5 * 1024 * 1024), {
-      message: "File size must be less than 5MB",
-    }),
-  description: z.string().optional(),
-});
-
-const appealFormSchema = z.object({
-  caseType: z.string().min(1, {
-    message: "Please select a case type.",
-  }),
-  caseDate: z.string().min(1, {
-    message: "Please enter the case date.",
-  }),
-  description: z.string().min(10, {
-    message: "Please provide a detailed description of your appeal (minimum 10 characters).",
-  }),
-  evidence: z.custom<FileList>().optional(),
-});
-
-const passwordFormSchema = z.object({
-  currentPassword: z.string().min(8, {
-    message: "Current password must be at least 8 characters.",
-  }),
-  newPassword: z.string().min(8, {
-    message: "New password must be at least 8 characters.",
-  }),
-  confirmPassword: z.string().min(8, {
-    message: "Confirm password must be at least 8 characters.",
-  }),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "New password and confirm password must match.",
-  path: ["confirmPassword"],
+  address: z.object({
+    line1: z.string().min(3, { message: "Address line 1 is required" }),
+    line2: z.string().optional(),
+    city: z.string().min(2, { message: "City is required" }),
+    county: z.string().min(2, { message: "County is required" }),
+    postalCode: z.string().min(5, { message: "Valid postal code is required" }),
+    country: z.string().default("United Kingdom")
+  })
 });
 
 const Profile: React.FC = () => {
-  const { currentUser } = useUser();
-  const { toast } = useToast();
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [uploadedDocuments, setUploadedDocuments] = useState<{ name: string; type: string; date: string }[]>([
-    { name: 'student_id.pdf', type: 'Student ID', date: '2023-01-15' },
-    { name: 'transcript.pdf', type: 'Transcript', date: '2023-02-10' },
-  ]);
+  // All refs declared at top level
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Profile Form
+  // Hook state declarations
+  const { isAuthenticated, currentUser } = useUser();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<StudentProfile>(defaultProfile);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  
+  // Forms initialized at the top level
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      name: currentUser.name,
-      email: currentUser.email,
-      phone: "1234567890",
-      address: "123 University Ave",
-      city: "College Town",
-      country: "United States",
-      postalCode: "12345",
-      bio: "Computer Science student with interests in AI and web development.",
-    },
+      phone: "",
+      personalEmail: "",
+      address: {
+        line1: "",
+        line2: "",
+        city: "",
+        county: "",
+        postalCode: "",
+        country: "United Kingdom"
+      }
+    }
   });
   
-  // Documents Form
-  const documentsForm = useForm<z.infer<typeof documentsFormSchema>>({
-    resolver: zodResolver(documentsFormSchema),
-    defaultValues: {
-      documentType: "",
-      description: "",
-    },
-  });
-  
-  // Appeal Form
-  const appealForm = useForm<z.infer<typeof appealFormSchema>>({
-    resolver: zodResolver(appealFormSchema),
-    defaultValues: {
-      caseType: "",
-      caseDate: "",
-      description: "",
-    },
-  });
-  
-  // Password Form
-  const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
-    resolver: zodResolver(passwordFormSchema),
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
+  // Fetch the student profile from the backend API
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        if (!isAuthenticated) {
+          setError('Please log in to view your profile');
+          setLoading(false);
+          return;
+        }
+        
+        // Get auth token from local storage
+        const authJson = localStorage.getItem('auth');
+        const token = authJson ? JSON.parse(authJson).token : null;
+        
+        if (!token) {
+          setError('Authentication token not found');
+          setLoading(false);
+          return;
+        }
+        
+        // Fetch profile from API
+        const response = await axios.get('/api/profile/student-profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        setProfile(response.data);
+        
+        // Update form values with loaded profile data
+        profileForm.reset({
+          phone: response.data.phone || "",
+          personalEmail: response.data.personalEmail || "",
+          address: {
+            line1: response.data.address?.line1 || "",
+            line2: response.data.address?.line2 || "",
+            city: response.data.address?.city || "",
+            county: response.data.address?.county || "",
+            postalCode: response.data.address?.postalCode || "",
+            country: response.data.address?.country || "United Kingdom"
+          }
+        });
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setError('Failed to load profile data. Please try again.');
+        setLoading(false);
+      }
+    };
+    
+    fetchProfile();
+  }, [isAuthenticated]);
   
   // Handle avatar change
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,65 +227,67 @@ const Profile: React.FC = () => {
   };
   
   // Handle profile form submission
-  const onProfileSubmit = (data: z.infer<typeof profileFormSchema>) => {
-    console.log(data);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been updated successfully.",
-    });
-  };
-  
-  // Handle documents form submission
-  const onDocumentsSubmit = (data: z.infer<typeof documentsFormSchema>) => {
-    console.log(data);
-    
-    if (data.documentFile && data.documentFile.length > 0) {
-      const newDoc = {
-        name: data.documentFile[0].name,
-        type: data.documentType,
-        date: new Date().toISOString().split('T')[0],
-      };
+  const onProfileSubmit = async (data: z.infer<typeof profileFormSchema>) => {
+    try {
+      // Get auth token
+      const authJson = localStorage.getItem('auth');
+      const token = authJson ? JSON.parse(authJson).token : null;
       
-      setUploadedDocuments([...uploadedDocuments, newDoc]);
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Authentication token not found",
+        });
+        return;
+      }
       
-      documentsForm.reset();
+      // Update profile via API
+      await axios.put('/api/profile/student-profile', data, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       toast({
-        title: "Document Uploaded",
-        description: "Your document has been uploaded successfully.",
+        title: "Profile Updated",
+        description: "Your profile information has been updated successfully.",
+      });
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive"
       });
     }
   };
   
-  // Handle appeal form submission
-  const onAppealSubmit = (data: z.infer<typeof appealFormSchema>) => {
-    console.log(data);
-    toast({
-      title: "Appeal Submitted",
-      description: "Your appeal has been submitted for review. You will be notified once it's processed.",
-    });
-    appealForm.reset();
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-64">
+          <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+          <p className="text-lg text-gray-600">Loading your profile...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
   
-  // Handle password form submission
-  const onPasswordSubmit = (data: z.infer<typeof passwordFormSchema>) => {
-    console.log(data);
-    toast({
-      title: "Password Changed",
-      description: "Your password has been changed successfully.",
-    });
-    passwordForm.reset();
-  };
+  // Error state
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-64">
+          <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+          <p className="text-lg text-gray-800 mb-2">Error</p>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
   
-  // Delete a document
-  const deleteDocument = (index: number) => {
-    setUploadedDocuments(current => current.filter((_, i) => i !== index));
-    toast({
-      title: "Document Deleted",
-      description: "The document has been deleted successfully.",
-    });
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -229,10 +296,8 @@ const Profile: React.FC = () => {
         </div>
         
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="appeals">Appeals</TabsTrigger>
             <TabsTrigger value="password">Password</TabsTrigger>
           </TabsList>
           
@@ -249,12 +314,12 @@ const Profile: React.FC = () => {
                 {/* Profile Picture */}
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={avatarPreview || currentUser.avatar} />
-                    <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={avatarPreview || profile.avatar} />
+                    <AvatarFallback>{profile.name ? profile.name.charAt(0) : 'U'}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-medium text-lg">{currentUser.name}</h3>
-                    <p className="text-sm text-gray-500">{currentUser.email}</p>
+                    <h3 className="font-medium text-lg">{profile.name}</h3>
+                    <p className="text-sm text-gray-500">{profile.email}</p>
                     <div className="mt-2">
                       <label htmlFor="avatar-upload" className="cursor-pointer">
                         <div className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-primary bg-primary/10 hover:bg-primary/20">
@@ -262,6 +327,7 @@ const Profile: React.FC = () => {
                           Change Avatar
                         </div>
                         <input 
+                          ref={fileInputRef}
                           id="avatar-upload" 
                           type="file" 
                           accept="image/*" 
@@ -273,341 +339,66 @@ const Profile: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Profile Form */}
-                <Form {...profileForm}>
-                  <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={profileForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled />
-                            </FormControl>
-                            <FormDescription>
-                              Contact your administrator to change your email.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone Number</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="address"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Address</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>City</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="country"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Country</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={profileForm.control}
-                        name="postalCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Postal Code</FormLabel>
-                            <FormControl>
-                              <Input {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <FormField
-                      control={profileForm.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bio</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Tell us a little about yourself"
-                              className="resize-none h-32"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button type="submit">Save Changes</Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Documents Tab */}
-          <TabsContent value="documents">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Upload Document Form */}
-              <Card className="md:col-span-1">
-                <CardHeader>
-                  <CardTitle>Upload Document</CardTitle>
-                  <CardDescription>
-                    Upload important documents for your student record.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...documentsForm}>
-                    <form onSubmit={documentsForm.handleSubmit(onDocumentsSubmit)} className="space-y-4">
-                      <FormField
-                        control={documentsForm.control}
-                        name="documentType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Document Type</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select document type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Student ID">Student ID</SelectItem>
-                                <SelectItem value="Transcript">Transcript</SelectItem>
-                                <SelectItem value="Medical Certificate">Medical Certificate</SelectItem>
-                                <SelectItem value="Recommendation Letter">Recommendation Letter</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={documentsForm.control}
-                        name="documentFile"
-                        render={({ field: { onChange, ...fieldProps } }) => (
-                          <FormItem>
-                            <FormLabel>Document File</FormLabel>
-                            <FormControl>
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                                <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500 mb-2">Click to upload or drag and drop</p>
-                                <p className="text-xs text-gray-400">
-                                  PDF, DOC, DOCX up to 5MB
-                                </p>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  id="document-upload"
-                                  onChange={(e) => {
-                                    onChange(e.target.files);
-                                  }}
-                                  accept=".pdf,.doc,.docx"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="mt-4"
-                                  onClick={() => document.getElementById('document-upload')?.click()}
-                                >
-                                  Select File
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={documentsForm.control}
-                        name="description"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Description (Optional)</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                {...field}
-                                placeholder="Add a brief description of the document"
-                                className="resize-none h-20"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <Button type="submit">Upload Document</Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-              
-              {/* Uploaded Documents List */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>My Documents</CardTitle>
-                  <CardDescription>
-                    View and manage your uploaded documents.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {uploadedDocuments.length > 0 ? (
-                    <div className="space-y-4">
-                      {uploadedDocuments.map((doc, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center">
-                            <div className="p-2 bg-primary/10 rounded-lg mr-4">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{doc.name}</h3>
-                              <p className="text-sm text-gray-500">
-                                {doc.type} • Uploaded on {doc.date}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                              </svg>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => deleteDocument(index)}>
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="mt-4">You haven't uploaded any documents yet.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          {/* Appeals Tab */}
-          <TabsContent value="appeals">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Submit Appeal Form */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>Submit Appeal</CardTitle>
-                  <CardDescription>
-                    Appeal a disciplinary action or request special consideration.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...appealForm}>
-                    <form onSubmit={appealForm.handleSubmit(onAppealSubmit)} className="space-y-4">
+                {/* Basic Info - Read Only */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Student Number</h3>
+                    <p className="text-gray-600">{profile.academicInfo?.studentNumber || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Department</h3>
+                    <p className="text-gray-600">{profile.academicInfo?.department || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Year of Study</h3>
+                    <p className="text-gray-600">{profile.academicInfo?.year || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Enrolment Date</h3>
+                    <p className="text-gray-600">{profile.academicInfo?.enrollDate || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Status</h3>
+                    <p className="text-gray-600">{profile.academicInfo?.status || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Date of Birth</h3>
+                    <p className="text-gray-600">{profile.dateOfBirth || 'Not available'}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Nationality</h3>
+                    <p className="text-gray-600">{profile.nationality || 'Not available'}</p>
+                  </div>
+                </div>
+                
+                {/* Editable Profile Form */}
+                <div className="border-t pt-6 mt-6">
+                  <h3 className="font-semibold text-lg mb-4">Contact Information</h3>
+                  <Form {...profileForm}>
+                    <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
-                          control={appealForm.control}
-                          name="caseType"
+                          control={profileForm.control}
+                          name="phone"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Appeal Type</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select appeal type" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="Grade Appeal">Grade Appeal</SelectItem>
-                                  <SelectItem value="Academic Misconduct">Academic Misconduct</SelectItem>
-                                  <SelectItem value="Attendance">Attendance Warning</SelectItem>
-                                  <SelectItem value="Extenuating Circumstances">Extenuating Circumstances</SelectItem>
-                                  <SelectItem value="Other">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <FormLabel>Phone Number</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Your phone number" {...field} />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                         
                         <FormField
-                          control={appealForm.control}
-                          name="caseDate"
+                          control={profileForm.control}
+                          name="personalEmail"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Date of Incident/Decision</FormLabel>
+                              <FormLabel>Personal Email</FormLabel>
                               <FormControl>
-                                <Input type="date" {...field} />
+                                <Input placeholder="Your personal email" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -615,117 +406,119 @@ const Profile: React.FC = () => {
                         />
                       </div>
                       
-                      <FormField
-                        control={appealForm.control}
-                        name="description"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Appeal Details</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                {...field}
-                                placeholder="Provide detailed information about your appeal..."
-                                className="resize-none h-40"
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Be specific about the circumstances and why you believe the appeal should be considered.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div>
+                        <h4 className="font-medium text-sm mb-3">Address</h4>
+                        <div className="space-y-4">
+                          <FormField
+                            control={profileForm.control}
+                            name="address.line1"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Address Line 1</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Street address" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={profileForm.control}
+                            name="address.line2"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Address Line 2 (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Apartment, suite, etc." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FormField
+                              control={profileForm.control}
+                              name="address.city"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>City</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="City" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={profileForm.control}
+                              name="address.county"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>County</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="County" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={profileForm.control}
+                              name="address.postalCode"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Postal Code</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Postal Code" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
                       
-                      <FormField
-                        control={appealForm.control}
-                        name="evidence"
-                        render={({ field: { onChange, ...fieldProps } }) => (
-                          <FormItem>
-                            <FormLabel>Supporting Evidence (Optional)</FormLabel>
-                            <FormControl>
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
-                                <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500">Upload supporting documents</p>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  id="evidence-upload"
-                                  onChange={(e) => {
-                                    onChange(e.target.files);
-                                  }}
-                                  multiple
-                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="mt-2"
-                                  onClick={() => document.getElementById('evidence-upload')?.click()}
-                                >
-                                  Choose Files
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormDescription>
-                              You can upload multiple files (PDF, DOC, DOCX, JPG, PNG).
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <Button type="submit">Submit Appeal</Button>
+                      <div className="pt-2">
+                        <Button type="submit">Save Changes</Button>
+                      </div>
                     </form>
                   </Form>
-                </CardContent>
-              </Card>
-              
-              {/* Appeal Guidelines */}
-              <Card className="md:col-span-1">
-                <CardHeader>
-                  <CardTitle>Appeal Guidelines</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium">Submission Deadline</h3>
-                      <p className="text-sm text-gray-600">Appeals must be submitted within 10 working days of the incident or decision.</p>
-                    </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Emergency Contact</CardTitle>
+                <CardDescription>
+                  Your registered emergency contact information.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Name</h3>
+                    <p className="text-gray-600">{profile.emergencyContact?.name || 'Not provided'}</p>
                   </div>
-                  
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium">Supporting Evidence</h3>
-                      <p className="text-sm text-gray-600">Provide all relevant documentation to support your appeal.</p>
-                    </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Relationship</h3>
+                    <p className="text-gray-600">{profile.emergencyContact?.relation || 'Not provided'}</p>
                   </div>
-                  
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium">Clear Explanation</h3>
-                      <p className="text-sm text-gray-600">Clearly explain the grounds for your appeal and what outcome you're seeking.</p>
-                    </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-medium text-sm">Phone Number</h3>
+                    <p className="text-gray-600">{profile.emergencyContact?.phone || 'Not provided'}</p>
                   </div>
-                  
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium">Processing Time</h3>
-                      <p className="text-sm text-gray-600">Appeals typically take 5-10 working days to process. Urgent cases may be expedited.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-blue-50 rounded-lg mt-6">
-                    <h3 className="font-medium text-blue-800">Need Help?</h3>
-                    <p className="text-sm text-blue-700 mt-1">If you need assistance with your appeal, please contact the Student Support Services at support@university.edu or call 123-456-7890.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardContent>
+              <CardFooter className="border-t bg-gray-50 flex flex-col items-start">
+                <p className="text-sm text-gray-600">To update your emergency contact information, please contact the Student Services Office.</p>
+              </CardFooter>
+            </Card>
           </TabsContent>
           
           {/* Password Tab */}
@@ -738,58 +531,29 @@ const Profile: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="max-w-md">
-                <Form {...passwordForm}>
-                  <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                    <FormField
-                      control={passwordForm.control}
-                      name="currentPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Current Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={passwordForm.control}
-                      name="newPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Password must be at least 8 characters and include a mix of letters, numbers, and symbols.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={passwordForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="pt-4">
-                      <Button type="submit">Change Password</Button>
-                    </div>
-                  </form>
-                </Form>
+                <form className="space-y-4">
+                  <div className="space-y-2">
+                    <FormLabel>Current Password</FormLabel>
+                    <Input type="password" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <FormLabel>New Password</FormLabel>
+                    <Input type="password" />
+                    <p className="text-xs text-gray-500">
+                      Password must be at least 8 characters and include a mix of letters, numbers, and symbols.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <FormLabel>Confirm New Password</FormLabel>
+                    <Input type="password" />
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Button type="submit">Change Password</Button>
+                  </div>
+                </form>
               </CardContent>
               <CardFooter className="flex flex-col items-start bg-gray-50 border-t">
                 <h3 className="font-medium">Password Tips:</h3>

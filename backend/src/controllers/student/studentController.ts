@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { pool, getDepartmentPool } from '../db';
+import { pool, getDepartmentPool } from '../../db';
 
 // Add a new student
 export const addStudent = async (req: Request, res: Response) => {

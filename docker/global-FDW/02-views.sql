@@ -1,8 +1,10 @@
 -- student view
 
 CREATE OR REPLACE VIEW central.student_directory AS
+
+-- CS Department
 SELECT 
-  'cs_' || s.user_id AS global_student_id,
+  uim.global_user_id,
   s.user_id          AS local_id,
   s.student_number,
   s.university_email,
@@ -13,25 +15,30 @@ SELECT
   s.enroll_date,
   s.status,
   'cs'               AS department_code
-FROM fdw_cs.students s
-LEFT JOIN fdw_cs.user_profiles up ON s.user_id = up.user_id
+FROM central.user_id_map uim
+JOIN central.departments d ON d.dept_id = uim.dept_id
+JOIN fdw_cs.students s ON s.user_id = uim.local_user_id AND d.schema_prefix = 'cs_schema'
+JOIN fdw_cs.user_profiles up ON s.user_id = up.user_id
 
 UNION ALL
 
+-- Math Department
 SELECT 
-  'math_' || s.user_id AS global_student_id,
-  s.user_id            AS local_id,
+  uim.global_user_id,
+  s.user_id          AS local_id,
   s.student_number,
   s.university_email,
   up.first_name,
   up.last_name,
   up.date_of_birth,
-  s.year               AS academic_year,
+  s.year             AS academic_year,
   s.enroll_date,
   s.status,
-  'math'               AS department_code
-FROM fdw_math.students s
-LEFT JOIN fdw_math.user_profiles up ON s.user_id = up.user_id;
+  'math'             AS department_code
+FROM central.user_id_map uim
+JOIN central.departments d ON d.dept_id = uim.dept_id
+JOIN fdw_math.students s ON s.user_id = uim.local_user_id AND d.schema_prefix = 'math_schema'
+JOIN fdw_math.user_profiles up ON s.user_id = up.user_id;
 
 -- central.module_enrollments
 

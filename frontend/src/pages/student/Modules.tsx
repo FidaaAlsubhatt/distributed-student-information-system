@@ -1,29 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TableList from '@/components/dashboard/TableList';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Clock, Trash2 } from 'lucide-react';
-import { modules } from '@/data/mockData';
+import { Eye, Clock, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import axios from 'axios';
+import { useUser } from '@/contexts/UserContext';
+
+// Define module type
+interface Module {
+  module_id: string;
+  module_code: string;
+  title: string;
+  description: string;
+  credits: number;
+  academic_year: string;
+  status: string;
+  grade: string;
+  instructor?: string; // This might come from a join or could be added later
+  semester?: string; // Derived from academic_year + term
+}
 
 const Modules: React.FC = () => {
+  const { isAuthenticated } = useUser();
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('All Semesters');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const activeModules = modules.filter(module => module.status === 'active');
-  const pastModules = modules.filter(module => module.status === 'completed');
+  // Fetch modules using email-based approach
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Check if authenticated first
+        if (!isAuthenticated) {
+          setError('Please log in to view your modules');
+          setLoading(false);
+          return;
+        }
+
+        console.log('Fetching modules from API...');
+        
+        // Get auth data exactly as API client does
+        const authJson = localStorage.getItem('auth');
+        const token = authJson ? JSON.parse(authJson).token : null;
+
+        if (!token) {
+          console.error('No token found in auth data');
+          setError('Authentication token not found');
+          setLoading(false);
+          return;
+        }
+
+        console.log('Using token:', token.substring(0, 15) + '...');
+        
+        // Make API request with the token
+        const response = await axios.get('/api/modules/student-modules', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('API response:', response.data);
+        
+        // Set the modules from the API response
+        setModules(response.data);
+        
+      } catch (err) {
+        console.error('Error fetching modules:', err);
+        setError('Failed to load modules. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModules();
+  }, [isAuthenticated]);
+  
+  // Split modules into active and completed
+  const activeModules = modules.filter(module => module.status.toLowerCase() === 'active');
+  const pastModules = modules.filter(module => module.status.toLowerCase() === 'completed' || 
+                                            module.status.toLowerCase() === 'passed' ||
+                                            module.grade !== 'Not Graded');
 
   // Filter active modules based on search and semester
   const filteredActiveModules = activeModules.filter(module => {
     const matchesSearch = 
-      module.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      module.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      module.instructor.toLowerCase().includes(searchTerm.toLowerCase());
+      module.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      module.module_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (module.instructor?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     
-    const matchesSemester = selectedSemester === 'All Semesters' || module.semester === selectedSemester;
+    // Extract semester from academic_year or use directly if available
+    const moduleSemester = module.semester || `${module.academic_year}`;
+    const matchesSemester = selectedSemester === 'All Semesters' || moduleSemester.includes(selectedSemester);
     
     return matchesSearch && matchesSemester;
   });
@@ -40,22 +117,22 @@ const Modules: React.FC = () => {
     {
       key: 'code',
       header: 'Code',
-      cell: (module) => <span className="font-medium text-gray-900">{module.code}</span>
+      cell: (module: Module) => <span className="font-medium text-gray-900">{module.module_code}</span>
     },
     {
       key: 'name',
       header: 'Module Name',
-      cell: (module) => <span className="text-gray-500">{module.name}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.title}</span>
     },
     {
-      key: 'instructor',
-      header: 'Instructor',
-      cell: (module) => <span className="text-gray-500">{module.instructor}</span>
+      key: 'academic_year',
+      header: 'Academic Year',
+      cell: (module: Module) => <span className="text-gray-500">{module.academic_year}</span>
     },
     {
       key: 'credits',
       header: 'Credits',
-      cell: (module) => <span className="text-gray-500">{module.credits}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.credits}</span>
     },
     {
       key: 'status',
@@ -95,27 +172,27 @@ const Modules: React.FC = () => {
     {
       key: 'code',
       header: 'Code',
-      cell: (module) => <span className="font-medium text-gray-900">{module.code}</span>
+      cell: (module: Module) => <span className="font-medium text-gray-900">{module.module_code}</span>
     },
     {
       key: 'name',
       header: 'Module Name',
-      cell: (module) => <span className="text-gray-500">{module.name}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.title}</span>
     },
     {
-      key: 'instructor',
-      header: 'Instructor',
-      cell: (module) => <span className="text-gray-500">{module.instructor}</span>
+      key: 'academic_year',
+      header: 'Academic Year',
+      cell: (module: Module) => <span className="text-gray-500">{module.academic_year}</span>
     },
     {
-      key: 'semester',
-      header: 'Semester',
-      cell: (module) => <span className="text-gray-500">{module.semester}</span>
+      key: 'credits',
+      header: 'Credits',
+      cell: (module: Module) => <span className="text-gray-500">{module.credits}</span>
     },
     {
       key: 'grade',
       header: 'Grade',
-      cell: (module) => <span className="font-medium text-gray-900">{module.grade}</span>
+      cell: (module: Module) => <span className="font-medium text-gray-900">{module.grade}</span>
     },
     {
       key: 'actions',
@@ -128,11 +205,15 @@ const Modules: React.FC = () => {
     }
   ];
 
+  // Generate semester options from available modules
   const semesterOptions = [
     { value: 'All Semesters', label: 'All Semesters' },
-    { value: 'Spring 2023', label: 'Spring 2023' },
-    { value: 'Fall 2022', label: 'Fall 2022' },
-    { value: 'Spring 2022', label: 'Spring 2022' }
+    ...Array.from(new Set(modules.map(m => m.academic_year)))
+      .filter(year => year)
+      .map(year => ({ 
+        value: year, 
+        label: `${year}` 
+      }))
   ];
 
   return (
@@ -147,7 +228,36 @@ const Modules: React.FC = () => {
           </Link>
         </div>
         
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <span>Loading your modules...</span>
+          </div>
+        )}
+        
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-50 p-4 rounded-md border border-red-200">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <span className="ml-2 text-red-700">{error}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* No modules state */}
+        {!loading && !error && modules.length === 0 && (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-500 mb-4">You are not currently enrolled in any modules.</p>
+            <Link href="/request-enrollment">
+              <Button>Browse Available Modules</Button>
+            </Link>
+          </div>
+        )}
+        
         {/* Current Modules */}
+        {!loading && !error && activeModules.length > 0 && (
         <TableList
           columns={activeModulesColumns}
           data={paginatedActiveModules}
@@ -167,14 +277,18 @@ const Modules: React.FC = () => {
           }}
         />
         
+        )}
+        
         {/* Past Modules */}
-        <div className="mt-8">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Past Modules</h3>
-          <TableList
-            columns={pastModulesColumns}
-            data={pastModules}
-          />
-        </div>
+        {!loading && !error && pastModules.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Past Modules</h3>
+            <TableList
+              columns={pastModulesColumns}
+              data={pastModules}
+            />
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

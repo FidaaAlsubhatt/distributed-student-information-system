@@ -56,17 +56,17 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/academic/dashboard">
-        <ProtectedRoute requiredRole="academic">
+        <ProtectedRoute requiredRole="academic_staff">
           <AcademicDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/department/dashboard">
-        <ProtectedRoute requiredRole="department">
+        <ProtectedRoute requiredRole="department_admin">
           <DepartmentDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/central/dashboard">
-        <ProtectedRoute requiredRole="central">
+        <ProtectedRoute requiredRole="central_admin">
           <CentralDashboard />
         </ProtectedRoute>
       </Route>
@@ -118,7 +118,7 @@ function Router() {
       <Route path="/audit-trail" component={SecurityMonitoring} />
       <Route path="/role-permissions" component={SecurityMonitoring} />
       <Route path="/manage-users">
-        <ProtectedRoute requiredRole="central">
+        <ProtectedRoute requiredRole="central_admin">
           <UserManagement />
         </ProtectedRoute>
       </Route>

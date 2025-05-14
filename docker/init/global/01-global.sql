@@ -71,3 +71,15 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   details      JSONB,
   created_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+
+CREATE TABLE IF NOT EXISTS user_id_map (
+  global_user_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  dept_id            INT NOT NULL REFERENCES departments(dept_id) ON DELETE CASCADE,
+  local_user_id      INT NOT NULL,
+  university_email   VARCHAR(255) NOT NULL,
+  role_type          VARCHAR(20), 
+  created_at         TIMESTAMP NOT NULL DEFAULT NOW(), 
+  UNIQUE(dept_id, local_user_id),
+  UNIQUE(dept_id, university_email)
+);

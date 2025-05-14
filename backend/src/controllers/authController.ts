@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { pool } from '../db';
+import { pool, getDepartmentPool } from '../db'; 
 
-// Define types based on new database schema
 interface User {
   user_id: string;
   email: string;
@@ -35,66 +34,51 @@ interface UserDepartmentRole {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    console.log('Login attempt:', req.body);
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
-      console.log('Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Get user from database
-    console.log('Querying database for user:', email);
     const userResult = await pool.query(
       'SELECT * FROM central.users WHERE email ILIKE $1',
       [email]
     );
 
-    console.log('User query result rows:', userResult.rows.length);
     const user: User = userResult.rows[0];
 
     if (!user) {
-      console.log('User not found');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    console.log('User found:', user.user_id, 'Status:', user.status);
-    
-    // Check if user is active
     if (user.status !== 'active') {
-      console.log('User account not active');
       return res.status(403).json({ message: 'Account is not active' });
     }
 
-    // Verify password
-    console.log('Verifying password...');
+    // Special handling for the template accounts during development
+    const isTemplateAccount = ['student@university.ac.uk', 'academic@university.ac.uk', 
+                             'department@university.ac.uk', 'admin@university.ac.uk'].includes(email);
     
-    // TEMPORARY FIX: Accept hardcoded password for testing
+    console.log(`Checking password for ${email}, hash: ${user.password_hash.substring(0, 20)}...`);
+    console.log(`Is template account: ${isTemplateAccount}`);
+    
+    // For template accounts, accept 'password123' directly (during development)
     let isPasswordValid = false;
     
-    if (password === 'password123') {
-      console.log('Using hardcoded password for testing');
+    if (isTemplateAccount && password === 'password123') {
+      console.log('Using hardcoded password comparison for template account');
       isPasswordValid = true;
     } else {
       isPasswordValid = await bcrypt.compare(password, user.password_hash);
     }
     
-    console.log('Password valid:', isPasswordValid);
-    
+    console.log(`Password valid: ${isPasswordValid}`);
+
     if (!isPasswordValid) {
-      console.log('Invalid password');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
-    // Get user profile
-    const profileResult = await pool.query(
-      'SELECT * FROM central.user_profiles WHERE user_id = $1',
-      [user.user_id]
-    );
-    const profile: UserProfile = profileResult.rows[0];
-
-    // Get user's roles
+    
+    // Step 1: Get user's roles and department roles
     const rolesResult = await pool.query(
       `SELECT ur.user_id, ur.role_id, r.name as role_name, r.scope as role_scope 
        FROM central.user_roles ur
@@ -103,8 +87,7 @@ export const login = async (req: Request, res: Response) => {
       [user.user_id]
     );
     const roles: UserRole[] = rolesResult.rows;
-
-    // Get user's department roles
+    
     const deptRolesResult = await pool.query(
       `SELECT udr.user_id, udr.dept_id, udr.role_id, r.name as role_name, 
               d.name as dept_name, d.schema_prefix
@@ -115,10 +98,68 @@ export const login = async (req: Request, res: Response) => {
       [user.user_id]
     );
     const departmentRoles: UserDepartmentRole[] = deptRolesResult.rows;
+    
+    // Step 2: Initialize profile
+    let profile: UserProfile | null = null;
+    
+    // Step 3: Determine profile source based on role
+    const hasCentralRole = roles.some(role => 
+      role.role_scope === 'central' && ['admin', 'central_admin'].includes(role.role_name)
+    );
+    
+    // Special handling for department admins who also have central-level data
+    const isDepartmentAdmin = roles.some(role => role.role_name === 'department_admin');
+    
+    if (hasCentralRole || isDepartmentAdmin) {
+      // For central admins and department admins, get profile from central database
+      const profileResult = await pool.query(
+        'SELECT * FROM central.user_profiles WHERE user_id = $1',
+        [user.user_id]
+      );
+      
+      if (profileResult.rowCount) {
+        profile = profileResult.rows[0];
+      }
+    } else if (departmentRoles.length > 0) {
+      // For department users (students/staff), go directly to their department DB
+      const primaryDeptRole = departmentRoles[0]; // Use first department role
+      const { schema_prefix } = primaryDeptRole;
+      
+      // Get user ID mapping - Use email instead of ID to avoid UUID format issues
+      const mapResult = await pool.query(
+        `SELECT local_user_id FROM central.user_id_map 
+         WHERE university_email = $1 AND dept_id = $2`,
+        [user.email, primaryDeptRole.dept_id]
+      );
+      
+      if (mapResult.rowCount) {
+        const { local_user_id } = mapResult.rows[0];
+        const deptPool = await getDepartmentPool(schema_prefix);
+        
+        // Fetch profile from department database
+        const deptProfileResult = await deptPool.query(
+          `SELECT first_name, last_name FROM ${schema_prefix}.user_profiles WHERE user_id = $1`,
+          [local_user_id]
+        );
+        
+        if (deptProfileResult.rowCount) {
+          profile = deptProfileResult.rows[0];
+        }
+      }
+    } else {
+      // Fallback: try central profile for any other case
+      const profileResult = await pool.query(
+        'SELECT * FROM central.user_profiles WHERE user_id = $1',
+        [user.user_id]
+      );
+      
+      if (profileResult.rowCount) {
+        profile = profileResult.rows[0];
+      }
+    }
 
-    // Create a JWT token
     const token = jwt.sign(
-      { 
+      {
         userId: user.user_id,
         email: user.email
       },
@@ -126,14 +167,12 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: '24h' }
     );
 
-    // Format roles for frontend
     const formattedRoles = roles.map(role => ({
       id: role.role_id,
       name: role.role_name,
       scope: role.role_scope
     }));
 
-    // Format department roles for frontend
     const formattedDeptRoles = departmentRoles.map(deptRole => ({
       id: deptRole.role_id,
       name: deptRole.role_name,
@@ -142,11 +181,10 @@ export const login = async (req: Request, res: Response) => {
       departmentCode: deptRole.schema_prefix
     }));
 
-    // Return user data and token
     return res.status(200).json({
       token,
       userId: user.user_id,
-      username: `${profile.first_name} ${profile.last_name}`,
+      username: profile ? `${profile.first_name} ${profile.last_name}` : user.email,
       email: user.email,
       roles: formattedRoles,
       departmentRoles: formattedDeptRoles

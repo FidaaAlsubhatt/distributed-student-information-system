@@ -1,7 +1,8 @@
 CREATE OR REPLACE VIEW central.vw_pending_users AS
+
 SELECT
-  'cs' AS department,
-  s.user_id,
+  'Computer Science' AS department,
+  s.user_id AS local_user_id,
   s.university_email AS email,
   up.first_name,
   up.last_name,
@@ -13,8 +14,8 @@ JOIN fdw_cs.user_profiles up ON up.user_id = s.user_id
 UNION ALL
 
 SELECT
-  'cs',
-  sf.user_id,
+  'Computer Science',
+  sf.user_id AS local_user_id,
   sf.university_email,
   up.first_name,
   up.last_name,
@@ -26,9 +27,9 @@ JOIN fdw_cs.user_profiles up ON up.user_id = sf.user_id
 UNION ALL
 
 SELECT
-  'math',
-  s.user_id,
-  s.university_email,
+  'Mathematics',
+  s.user_id AS local_user_id,
+  s.university_email AS email,
   up.first_name,
   up.last_name,
   up.date_of_birth,
@@ -39,8 +40,8 @@ JOIN fdw_math.user_profiles up ON up.user_id = s.user_id
 UNION ALL
 
 SELECT
-  'math',
-  sf.user_id,
+  'Mathematics',
+  sf.user_id AS local_user_id,
   sf.university_email,
   up.first_name,
   up.last_name,

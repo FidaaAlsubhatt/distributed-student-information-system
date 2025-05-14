@@ -13,6 +13,9 @@ import * as authController from './controllers/authController';
 import dashboardRoutes from './dashboard/dashboard.routes';
 import adminUserRoutes from './admin/user.routes';
 import userRoutes from './routes/user.routes';
+import moduleRoutes from './routes/module.routes';
+import assignmentRoutes from './routes/assignment.routes';
+import profileRoutes from './routes/profile.routes';
 
 const app = express();
 app.use(cors());
@@ -24,6 +27,9 @@ app.get('/api/auth/verify', authController.verifyToken);
 app.post('/api/auth/logout', authController.logout);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/modules', moduleRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api', userRoutes);
 
 const port = process.env.PORT || 3001;

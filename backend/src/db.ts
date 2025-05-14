@@ -17,45 +17,61 @@ export const pool = new Pool({
 // Cache for department-specific connection pools
 const departmentPoolCache = new Map<string, Pool>();
 
+// Map schema_prefix values to department database connection details
+const departmentConfigs: Record<string, any> = {
+  'cs_schema': {
+    host: process.env.CS_DB_HOST || 'localhost',
+    port: parseInt(process.env.CS_DB_PORT || '5433'),
+    database: process.env.CS_DB_NAME || 'cs_sis',
+    user: process.env.CS_DB_USER || 'cs_admin',
+    password: process.env.CS_DB_PASSWORD || 'cspass',
+  },
+  'math_schema': {
+    host: process.env.MATH_DB_HOST || 'localhost',
+    port: parseInt(process.env.MATH_DB_PORT || '5434'),
+    database: process.env.MATH_DB_NAME || 'math_sis',
+    user: process.env.MATH_DB_USER || 'math_admin',
+    password: process.env.MATH_DB_PASSWORD || 'mathpass',
+  }
+};
+
 // Create a function to get a department-specific connection pool
-export const getDepartmentPool = async (departmentCode: string): Promise<Pool> => {
+export const getDepartmentPool = async (schemaPrefix: string): Promise<Pool> => {
   // Check cache first
-  if (departmentPoolCache.has(departmentCode)) {
-    return departmentPoolCache.get(departmentCode)!;
+  if (departmentPoolCache.has(schemaPrefix)) {
+    return departmentPoolCache.get(schemaPrefix)!;
   }
 
-  // If not in cache, query global_sis for department connection details
-  const query = {
-    text: 'SELECT dept_db_host, dept_db_port, dept_db_name, dept_db_user, dept_db_password FROM central.departments WHERE department_code = $1',
-    values: [departmentCode],
-  };
-
   try {
-    const result = await pool.query(query);
-    if (result.rows.length === 0) {
-      throw new Error(`Connection details not found for department: ${departmentCode}`);
+    // Get schema info from departments table
+    const deptResult = await pool.query(
+      'SELECT schema_prefix FROM central.departments WHERE schema_prefix = $1',
+      [schemaPrefix]
+    );
+
+    // Validate schema prefix exists
+    if (deptResult.rows.length === 0) {
+      throw new Error(`Schema prefix not found: ${schemaPrefix}`);
     }
 
-    const deptConfig = result.rows[0];
+    // Get the department configuration from our static map
+    const deptConfig = departmentConfigs[schemaPrefix];
+    if (!deptConfig) {
+      throw new Error(`Connection configuration not found for schema: ${schemaPrefix}`);
+    }
 
-    const newDepartmentPool = new Pool({
-      host: deptConfig.dept_db_host || process.env.DEPT_DB_HOST || 'localhost',
-      port: parseInt(deptConfig.dept_db_port || process.env.DEPT_DB_PORT || '5436'),
-      database: deptConfig.dept_db_name || process.env.DEPT_DB_NAME || 'dept_sis', // Fallback, though ideally config should be complete
-      user: deptConfig.dept_db_user || process.env.DEPT_DB_USER || 'admin',
-      password: deptConfig.dept_db_password || process.env.DEPT_DB_PASSWORD || 'adminpass',
-      // No search_path needed as we are connecting to a specific DB
-    });
+    // Create a new pool with the department config
+    const newDepartmentPool = new Pool(deptConfig);
 
-    // Test the new department pool connection (optional, but good for diagnostics)
+    // Test the connection
     await newDepartmentPool.query('SELECT NOW()');
-    console.log(`✅ Database connected for department: ${departmentCode} to ${deptConfig.dept_db_name} on ${deptConfig.dept_db_host}:${deptConfig.dept_db_port}`);
+    console.log(`✅ Connected to department DB for schema: ${schemaPrefix}`);
 
     // Store in cache
-    departmentPoolCache.set(departmentCode, newDepartmentPool);
+    departmentPoolCache.set(schemaPrefix, newDepartmentPool);
     return newDepartmentPool;
   } catch (error) {
-    console.error(`❌ Error creating/connecting department pool for ${departmentCode}:`, error);
+    console.error(`❌ Error creating/connecting department pool for ${schemaPrefix}:`, error);
     throw error; // Re-throw to be handled by caller
   }
 };
