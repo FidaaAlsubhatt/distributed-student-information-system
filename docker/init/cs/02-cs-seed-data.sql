@@ -149,6 +149,24 @@ INSERT INTO extenuating_circumstances (student_id, reason, documents, status, cr
 (5, 'Medical emergency during midterms', 'medical_certificate_wj.pdf', 'approved', NOW()),
 (2, 'Bereavement in family affecting coursework', 'bereavement_letter_et.pdf', 'pending', NOW());
 
+-- 21. Seed module_staff
+INSERT INTO module_staff (module_id, staff_id, role) VALUES
+-- Senior Lecturer Robert Smith (user_id 6) teaches Introduction to Programming and Data Structures
+(1, 6, 'senior lecturer'),
+(2, 6, 'senior lecturer'),
+-- Professor Elizabeth Johnson (user_id 7) teaches Database Systems and Machine Learning
+(3, 7, 'professor'),
+(5, 7, 'professor'),
+-- Lecturer Andrew Davies (user_id 8) teaches Computer Architecture and Web Development
+(6, 8, 'lecturer'),
+(8, 8, 'lecturer'),
+-- Senior Lecturer Victoria Williams (user_id 9) teaches Software Engineering and Computer Networks
+(7, 9, 'senior lecturer'),
+(9, 9, 'senior lecturer'),
+-- Professor Michael Thomas (user_id 10) teaches Artificial Intelligence and Cybersecurity
+(4, 10, 'professor'),
+(10, 10, 'professor');
+
 -- 21. Seed enrollments
 INSERT INTO enrollments (student_id, module_id, status, request_date) VALUES
 (1, 1, 'registered', '2024-09-01'),

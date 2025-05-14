@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TableList from '@/components/dashboard/TableList';
 import { useForm } from 'react-hook-form';
@@ -25,12 +25,12 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Pencil, Trash2, FileText, Users, Calendar } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, FileText, Users, Calendar, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { modules } from '@/data/mockData';
+import { getAcademicModules, deleteModule, updateModule, createModule, ModuleUpdateData, ModuleCreateData } from '@/services/api/staff';
 
 const moduleFormSchema = z.object({
   code: z.string().min(2, { message: "Module code is required" }),
@@ -45,22 +45,75 @@ const moduleFormSchema = z.object({
 
 type FormValues = z.infer<typeof moduleFormSchema>;
 
+// Define module type
+interface Module {
+  module_id: string;
+  code: string;
+  title: string;
+  description: string;
+  credits: number;
+  semester: string;
+  academic_year: string;
+  status: string;
+  instructor: string;
+  enrolled_students: number;
+  capacity: number;
+  is_active: boolean;
+}
+
 const ManageModules: React.FC = () => {
   const { toast } = useToast();
-  const [selectedModule, setSelectedModule] = useState<any | null>(null);
+  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('All Semesters');
+  const [modules, setModules] = useState<Module[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [department, setDepartment] = useState<string>('');
   
-  const activeModules = modules.filter(module => module.status === 'active');
+  // Fetch modules from the API
+  useEffect(() => {
+    const fetchModules = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('Fetching academic modules from API...');
+        
+        const response = await getAcademicModules();
+        console.log('Academic modules API response:', response);
+        
+        if (response.modules) {
+          setModules(response.modules);
+          if (response.department) {
+            setDepartment(response.department);
+            console.log('Department from modules API:', response.department);
+          }
+        } else {
+          setError('Module data not found in response');
+        }
+      } catch (err) {
+        console.error('Error fetching modules:', err);
+        setError('Failed to load modules. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchModules();
+  }, []);
+  
+  const activeModules = modules.filter(module => module.status === 'active' || module.is_active);
   
   // Filter modules based on search and semester
   const filteredModules = activeModules.filter(module => {
     const matchesSearch = 
-      module.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      module.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       module.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      module.instructor.toLowerCase().includes(searchTerm.toLowerCase());
+      (module.instructor && module.instructor.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesSemester = selectedSemester === 'All Semesters' || module.semester === selectedSemester;
     
@@ -94,52 +147,175 @@ const ManageModules: React.FC = () => {
   });
   
   // Handle form submission for new module
-  const onSubmit = (data: FormValues) => {
-    console.log(data);
-    toast({
-      title: "Module Created",
-      description: `Module ${data.code} - ${data.name} has been created successfully.`,
-    });
-    setIsCreateDialogOpen(false);
-    form.reset();
+  const onSubmit = async (data: FormValues) => {
+    try {
+      setLoading(true);
+      
+      // Prepare module data for API
+      const moduleData: ModuleCreateData = {
+        code: data.code,
+        name: data.name,
+        credits: data.credits,
+        description: data.description,
+        semester: data.semester,
+        prerequisites: data.prerequisites
+      };
+      
+      // Call the API to create the module
+      const createResponse = await createModule(moduleData);
+      console.log('Module creation response:', createResponse);
+      
+      // Show success toast
+      toast({
+        title: "Module Created",
+        description: createResponse.message || `Module ${data.code} - ${data.name} has been created successfully.`,
+      });
+      
+      // Refresh the modules list
+      const response = await getAcademicModules();
+      if (response.modules) {
+        setModules(response.modules);
+      }
+      
+      setIsCreateDialogOpen(false);
+      form.reset();
+    } catch (error: any) {
+      console.error('Error creating module:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to create module. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
   
   // Handle form submission for edit module
-  const onEditSubmit = (data: FormValues) => {
-    console.log(data);
-    toast({
-      title: "Module Updated",
-      description: `Module ${data.code} - ${data.name} has been updated successfully.`,
-    });
-    setIsEditDialogOpen(false);
-    editForm.reset();
+  const onEditSubmit = async (data: FormValues) => {
+    try {
+      if (!selectedModule) {
+        toast({
+          title: "Error",
+          description: "No module selected for editing.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setLoading(true);
+      
+      // Prepare module data for API
+      const moduleData: ModuleUpdateData = {
+        code: data.code,
+        name: data.name,
+        credits: data.credits,
+        description: data.description,
+        semester: data.semester,
+        prerequisites: data.prerequisites
+      };
+      
+      // Call the API to update the module
+      const updateResponse = await updateModule(selectedModule.module_id, moduleData);
+      console.log('Module update response:', updateResponse);
+      
+      // Show success toast
+      toast({
+        title: "Module Updated",
+        description: updateResponse.message || `Module ${data.code} - ${data.name} has been updated successfully.`,
+      });
+      
+      // Refresh the modules list
+      const response = await getAcademicModules();
+      if (response.modules) {
+        setModules(response.modules);
+      }
+      
+      setIsEditDialogOpen(false);
+      editForm.reset();
+    } catch (error: any) {
+      console.error('Error updating module:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update module. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
-  
+
   // Open the edit dialog and populate form with module data
-  const handleEditModule = (module: any) => {
+  const handleEditModule = (module: Module) => {
     setSelectedModule(module);
     editForm.setValue('code', module.code);
-    editForm.setValue('name', module.name);
+    editForm.setValue('name', module.title);
     editForm.setValue('credits', module.credits.toString());
-    editForm.setValue('description', 'This module covers the fundamental concepts of the subject area and provides students with practical experience through assignments and projects.');
+    editForm.setValue('description', module.description);
     editForm.setValue('semester', module.semester);
-    editForm.setValue('prerequisites', 'None');
     setIsEditDialogOpen(true);
   };
-  
+
+  // Handle module deletion
+  const handleDeleteModule = (module: Module) => {
+    setSelectedModule(module);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Confirm module deletion
+  const confirmDeleteModule = async () => {
+    try {
+      if (!selectedModule) {
+        toast({
+          title: "Error",
+          description: "No module selected for deletion.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setLoading(true);
+
+      // Call the API to delete the module
+      const response = await deleteModule(selectedModule.module_id);
+      console.log('Module deletion response:', response);
+
+      // Update the local state to remove the deleted module
+      setModules(prevModules => prevModules.filter(m => m.module_id !== selectedModule.module_id));
+
+      // Show success toast
+      toast({
+        title: "Module Deleted",
+        description: response.message || `Module ${selectedModule.code} has been deleted successfully.`,
+      });
+
+      setIsDeleteDialogOpen(false);
+      setSelectedModule(null);
+    } catch (error: any) {
+      console.error('Error deleting module:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to delete module. It may have enrolled students or be referenced by other modules.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Module details dialog content
-  const ModuleDetailsContent = ({ module }: { module: any }) => (
+  const ModuleDetailsContent = ({ module }: { module: Module }) => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">{module.code}</h2>
-          <p className="text-gray-500">{module.name}</p>
+          <p className="text-gray-500">{module.title}</p>
         </div>
         <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
           Active
         </Badge>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4 text-sm border-t pt-4">
         <div>
           <p className="text-gray-500">Credits</p>
@@ -155,28 +331,28 @@ const ManageModules: React.FC = () => {
         </div>
         <div>
           <p className="text-gray-500">Status</p>
-          <p className="font-medium">Active</p>
+          <p className="font-medium">{module.is_active ? 'Active' : 'Inactive'}</p>
         </div>
       </div>
-      
+
       <div className="border-t pt-4">
         <p className="text-gray-500">Description</p>
         <p className="mt-1">
-          This module covers the fundamental concepts of the subject area and provides students with practical experience through assignments and projects.
+          {module.description || 'No description available for this module.'}
         </p>
       </div>
-      
+
       <div className="border-t pt-4">
         <p className="text-gray-500">Prerequisites</p>
         <p className="mt-1">None</p>
       </div>
-      
+
       <div className="border-t pt-4 flex gap-2">
         <Button variant="outline" className="flex-1" onClick={() => handleEditModule(module)}>
           <Pencil className="h-4 w-4 mr-2" />
           Edit Module
         </Button>
-        <Button variant="destructive" className="flex-1">
+        <Button variant="destructive" className="flex-1" onClick={() => handleDeleteModule(module)}>
           <Trash2 className="h-4 w-4 mr-2" />
           Delete Module
         </Button>
@@ -189,32 +365,37 @@ const ManageModules: React.FC = () => {
     {
       key: 'code',
       header: 'Code',
-      cell: (module: any) => <span className="font-medium text-gray-900">{module.code}</span>
+      cell: (module: Module) => <span className="font-medium text-gray-900">{module.code}</span>
     },
     {
       key: 'name',
       header: 'Module Name',
-      cell: (module: any) => <span className="text-gray-500">{module.name}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.title}</span>
     },
     {
       key: 'instructor',
       header: 'Instructor',
-      cell: (module: any) => <span className="text-gray-500">{module.instructor}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.instructor}</span>
+    },
+    {
+      key: 'enrollment',
+      header: 'Enrollment',
+      cell: (module: Module) => <span className="text-gray-500">{module.enrolled_students} / {module.capacity}</span>
     },
     {
       key: 'credits',
       header: 'Credits',
-      cell: (module: any) => <span className="text-gray-500">{module.credits}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.credits}</span>
     },
     {
       key: 'semester',
       header: 'Semester',
-      cell: (module: any) => <span className="text-gray-500">{module.semester}</span>
+      cell: (module: Module) => <span className="text-gray-500">{module.semester}</span>
     },
     {
       key: 'actions',
       header: 'Actions',
-      cell: (module: any) => (
+      cell: (module: Module) => (
         <div className="flex space-x-2">
           <Dialog>
             <DialogTrigger asChild>
@@ -243,24 +424,78 @@ const ManageModules: React.FC = () => {
           >
             <Pencil className="h-4 w-4" />
           </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-red-600 hover:text-red-700"
+            onClick={() => handleDeleteModule(module)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       )
     }
   ];
   
-  // Semester options for filter
+  // Generate semester options from available modules
   const semesterOptions = [
     { value: 'All Semesters', label: 'All Semesters' },
-    { value: 'Spring 2023', label: 'Spring 2023' },
-    { value: 'Fall 2022', label: 'Fall 2022' },
-    { value: 'Spring 2022', label: 'Spring 2022' }
+    ...Array.from(new Set(modules.map(m => m.semester)))
+      .filter(semester => semester)
+      .map(semester => ({ 
+        value: semester, 
+        label: semester
+      }))
   ];
 
   return (
     <DashboardLayout>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Module</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this module? This action cannot be undone.
+              {selectedModule?.enrolled_students > 0 && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="text-amber-700 text-sm">
+                    This module has {selectedModule?.enrolled_students} enrolled students. Deleting it will mark it as inactive instead.
+                  </span>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteModule}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>Delete Module</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">Manage Modules</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-800">Manage Modules</h2>
+            {department && (
+              <Badge className="capitalize bg-blue-100 text-blue-800">
+                {department.replace('_schema', '')} Department
+              </Badge>
+            )}
+          </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -334,9 +569,9 @@ const ManageModules: React.FC = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Spring 2023">Spring 2023</SelectItem>
-                            <SelectItem value="Fall 2023">Fall 2023</SelectItem>
-                            <SelectItem value="Spring 2024">Spring 2024</SelectItem>
+                            <SelectItem value="Autumn 2024">Autumn 2024</SelectItem>
+                            <SelectItem value="Spring 2025">Spring 2025</SelectItem>
+                            <SelectItem value="Summer 2025">Summer 2025</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -391,14 +626,42 @@ const ManageModules: React.FC = () => {
           </Dialog>
         </div>
         
-        <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="active">Active Modules</TabsTrigger>
-            <TabsTrigger value="upcoming">Upcoming Modules</TabsTrigger>
-            <TabsTrigger value="past">Past Modules</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="active" className="mt-6">
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+            <span>Loading your modules...</span>
+          </div>
+        )}
+        
+        {/* Error state */}
+        {error && (
+          <div className="bg-red-50 p-4 rounded-md border border-red-200">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <span className="ml-2 text-red-700">{error}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* No modules state */}
+        {!loading && !error && modules.length === 0 && (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <p className="text-gray-500 mb-4">You are not currently teaching any modules.</p>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>Create New Module</Button>
+          </div>
+        )}
+        
+        {/* Modules content */}
+        {!loading && !error && modules.length > 0 && (
+          <Tabs defaultValue="active" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="active">Active Modules</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming Modules</TabsTrigger>
+              <TabsTrigger value="past">Past Modules</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="active" className="mt-6">
             <TableList
               columns={moduleColumns}
               data={filteredModules}
@@ -438,6 +701,7 @@ const ManageModules: React.FC = () => {
             />
           </TabsContent>
         </Tabs>
+        )}
         
         {/* Edit Module Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -507,9 +771,9 @@ const ManageModules: React.FC = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Spring 2023">Spring 2023</SelectItem>
-                          <SelectItem value="Fall 2023">Fall 2023</SelectItem>
-                          <SelectItem value="Spring 2024">Spring 2024</SelectItem>
+                            <SelectItem value="Autumn 2024">Autumn 2024</SelectItem>
+                            <SelectItem value="Spring 2025">Spring 2025</SelectItem>
+                            <SelectItem value="Summer 2025">Summer 2025</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

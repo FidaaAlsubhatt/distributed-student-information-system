@@ -80,6 +80,15 @@ CREATE TABLE modules (
   is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Create module_staff table
+CREATE TABLE module_staff (
+  id SERIAL PRIMARY KEY,
+  module_id INT REFERENCES modules(module_id) ON DELETE CASCADE,
+  staff_id INT REFERENCES staff(user_id) ON DELETE CASCADE,
+  role VARCHAR(50) DEFAULT 'lecturer',
+  UNIQUE(module_id, staff_id)
+);
+
 CREATE TABLE program_modules (
   id SERIAL PRIMARY KEY,
   program_id INT REFERENCES programs(program_id) ON DELETE CASCADE,

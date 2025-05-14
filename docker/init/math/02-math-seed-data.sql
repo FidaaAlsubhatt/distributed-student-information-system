@@ -99,6 +99,19 @@ INSERT INTO locations (type, building, name, capacity, description) VALUES
 ('lecture_hall', 'Maths Building', 'Room A', 150, 'Main lecture hall'),
 ('tutorial_room', 'Maths Building', 'Room B', 30, 'Tutorial room');
 
+-- 16. Seed module_staff
+INSERT INTO module_staff (module_id, staff_id, role) VALUES
+-- Professor Jonathan Phillips (user_id 6) teaches Calculus I
+(1, 6, 'professor'),
+-- Senior Lecturer Sophia Richardson (user_id 7) teaches Linear Algebra
+(2, 7, 'senior lecturer'),
+-- Lecturer Benjamin Cooper (user_id 8) teaches Real Analysis
+(3, 8, 'lecturer'),
+-- Professor Katherine Lewis (user_id 9) co-teaches Calculus I
+(1, 9, 'professor'),
+-- Senior Lecturer Daniel Morgan (user_id 10) co-teaches Linear Algebra
+(2, 10, 'senior lecturer');
+
 -- 16. Seed exams
 INSERT INTO exams (module_id, title, exam_date, location_id) VALUES
 (1, 'Calculus I Exam', '2024-12-10 10:00:00', 1),
