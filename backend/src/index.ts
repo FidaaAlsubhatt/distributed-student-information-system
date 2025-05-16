@@ -18,6 +18,7 @@ import assignmentRoutes from './routes/assignment.routes';
 import profileRoutes from './routes/profile.routes';
 import timetableRoutes from './routes/timetable.routes';
 import staffRoutes from './routes/staff.routes';
+import departmentAdminRoutes from './routes/departmentAdmin/departmentAdminRoutes';
 
 const app = express();
 app.use(cors());
@@ -34,6 +35,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/department', departmentAdminRoutes);
 app.use('/api', userRoutes);
 
 const port = process.env.PORT || 3001;

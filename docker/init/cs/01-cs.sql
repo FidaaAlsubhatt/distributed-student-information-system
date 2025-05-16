@@ -119,6 +119,10 @@ CREATE TABLE assignments (
   title TEXT NOT NULL,
   description TEXT,
   due_date DATE NOT NULL
+  instructions TEXT,
+  total_marks INT NOT NULL DEFAULT 100,
+  weight NUMERIC(5,2) NOT NULL DEFAULT 1.0,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE submissions (
@@ -127,8 +131,16 @@ CREATE TABLE submissions (
   student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
   file_path TEXT,
   submitted_at TIMESTAMP DEFAULT NOW(),
-  grade NUMERIC(5,2),
-  feedback TEXT
+);
+
+CREATE TABLE assignment_grades (
+  grade_id SERIAL PRIMARY KEY,
+  submission_id INT REFERENCES submissions(submission_id) ON DELETE CASCADE,
+  staff_id INT REFERENCES staff(user_id) ON DELETE SET NULL,
+  grade NUMERIC(5,2) NOT NULL,
+  feedback TEXT,
+  graded_at TIMESTAMP DEFAULT NOW(),
+  revision_number INT DEFAULT 1
 );
 
 CREATE TABLE module_grades (

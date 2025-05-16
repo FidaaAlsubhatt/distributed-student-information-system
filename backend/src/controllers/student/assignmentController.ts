@@ -54,13 +54,36 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
       SELECT 
         a.assignment_id::text as id,
         a.title,
+        a.description,
+        a.instructions,
+        a.total_marks as totalMarks,
+        a.weight,
+        a.created_at as createdAt,
         m.title as module,
         m.code as moduleCode,
         a.due_date as dueDate,
-        CASE 
-          WHEN s.submission_id IS NULL THEN 'pending'
-          WHEN s.grade IS NULL THEN 'submitted'
-          ELSE 'graded'
+        CASE
+          -- First handle submitted and graded statuses with higher priority
+          WHEN s.submission_id IS NOT NULL AND s.grade IS NOT NULL THEN 
+            CASE 
+              WHEN (
+                SELECT COUNT(*) 
+                FROM ${schema_prefix}.submissions 
+                WHERE assignment_id = a.assignment_id AND grade IS NOT NULL
+              ) = (
+                SELECT COUNT(*) 
+                FROM ${schema_prefix}.enrollments 
+                WHERE module_id = m.module_id
+              ) THEN 'fully_graded'
+              ELSE 'partially_graded'
+            END
+          WHEN s.submission_id IS NOT NULL THEN 'submitted'
+          
+          -- Then handle time-based statuses for assignments not yet submitted
+          WHEN a.due_date < NOW() THEN 'overdue'
+          WHEN DATE(a.due_date) = CURRENT_DATE THEN 'due_today'
+          WHEN a.due_date <= NOW() + INTERVAL '7 days' THEN 'due_soon'
+          ELSE 'upcoming'
         END as status,
         s.grade::text as grade,
         s.feedback,

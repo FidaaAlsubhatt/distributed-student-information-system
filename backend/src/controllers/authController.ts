@@ -56,7 +56,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Special handling for the template accounts during development
-    const isTemplateAccount = ['student@university.ac.uk', 'academic@university.ac.uk', 
+    const isTemplateAccount = ['math.Admin@university.ac.uk', 
                              'department@university.ac.uk', 'admin@university.ac.uk'].includes(email);
     
     console.log(`Checking password for ${email}, hash: ${user.password_hash.substring(0, 20)}...`);

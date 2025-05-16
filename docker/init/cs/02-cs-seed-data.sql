@@ -181,3 +181,45 @@ INSERT INTO timetables (module_id, type, event_date, location_id) VALUES
 (1, 'lab', '2024-09-27 14:00:00', 3),
 (2, 'lecture', '2024-09-26 11:00:00', 1),
 (3, 'lecture', '2024-09-28 10:00:00', 2);
+
+-- Step 1: Add the missing columns to the assignments table
+ALTER TABLE cs_schema.assignments
+  ADD COLUMN IF NOT EXISTS instructions TEXT,
+  ADD COLUMN IF NOT EXISTS total_marks INT NOT NULL DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS weight NUMERIC(5,2) NOT NULL DEFAULT 25.0,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+-- Step 2: Update existing assignments with appropriate data
+-- Programming Basics (module_id = 1)
+UPDATE cs_schema.assignments SET
+  instructions = 'Complete all programming exercises in the assignment sheet. Use proper variable naming and include comments to explain your code. Submit a single zip file containing all source code files.',
+  total_marks = 100,
+  weight = 30.0
+WHERE module_id = 1 AND title = 'Programming Basics';
+
+-- Array Task (module_id = 2)
+UPDATE cs_schema.assignments SET
+  instructions = 'Implement the array-based data structures discussed in class. Include unit tests for each implementation. Your code should follow the style guide provided.',
+  total_marks = 100,
+  weight = 35.0
+WHERE module_id = 2 AND title = 'Array Task';
+
+-- Database Design (module_id = 3)
+UPDATE cs_schema.assignments SET
+  instructions = 'Design a relational database for the given case study. Include an ER diagram, normalized tables, and sample SQL queries. Submit as a PDF report.',
+  total_marks = 100,
+  weight = 40.0
+WHERE module_id = 3 AND title = 'Database Design';
+
+-- Step 3: Add new assignments for modules that don't have any
+INSERT INTO cs_schema.assignments (module_id, title, description, instructions, due_date, total_marks, weight, created_at)
+SELECT 4, 'Artificial Intelligence Implementation', 'Implement a machine learning algorithm from scratch.',
+  'Choose one of the following algorithms: Decision Trees, Naive Bayes, or k-Nearest Neighbors. Implement it without using ML libraries. Write a 2-page report explaining your implementation and results.',
+  '2024-11-25', 100, 45.0, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM cs_schema.assignments WHERE module_id = 4);
+
+INSERT INTO cs_schema.assignments (module_id, title, description, instructions, due_date, total_marks, weight, created_at)
+SELECT 5, 'Machine Learning Project', 'Build and evaluate a machine learning model on a real-world dataset.',
+  'Select a dataset from the provided options, preprocess the data, train a model, and evaluate its performance. Write a comprehensive report explaining your approach and findings.',
+  '2024-12-05', 100, 50.0, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM cs_schema.assignments WHERE module_id = 5);

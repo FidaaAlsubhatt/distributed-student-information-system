@@ -177,3 +177,333 @@ export const updateStudentGrade = async (moduleId: string, studentId: string, as
     throw error;
   }
 };
+
+// Assignment interfaces
+export interface AssignmentCreateData {
+  title: string;
+  moduleId: string;
+  dueDate: Date;
+  totalMarks: string;
+  weight: string;
+  description: string;
+  instructions: string;
+}
+
+export interface AssignmentUpdateData {
+  title: string;
+  dueDate: Date;
+  totalMarks: string;
+  weight: string;
+  description: string;
+  instructions: string;
+}
+
+// Get assignments for academic staff
+export const getAssignments = async () => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.get('/api/staff/assignments', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching assignments:', error);
+    throw error;
+  }
+};
+
+// Get submissions for a specific assignment
+export const getAssignmentSubmissions = async (assignmentId: string) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.get(`/api/staff/assignments/${assignmentId}/submissions`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching assignment submissions:', error);
+    throw error;
+  }
+};
+
+// Create a new assignment
+export const createAssignment = async (assignmentData: AssignmentCreateData) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.post('/api/staff/assignments', 
+      assignmentData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error creating assignment:', error);
+    throw error;
+  }
+};
+
+// Update an existing assignment
+export const updateAssignment = async (assignmentId: string, assignmentData: AssignmentUpdateData) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.put(`/api/staff/assignments/${assignmentId}`, 
+      assignmentData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error updating assignment:', error);
+    throw error;
+  }
+};
+
+// Delete an assignment
+export const deleteAssignment = async (assignmentId: string) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.delete(`/api/staff/assignments/${assignmentId}`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting assignment:', error);
+    throw error;
+  }
+};
+
+// Update submission grade
+export const updateSubmissionGrade = async (assignmentId: string, studentId: string, grade: string, feedback?: string) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.put(
+      `/api/staff/assignments/${assignmentId}/students/${studentId}/grade`,
+      { grade, feedback },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error updating submission grade:', error);
+    throw error;
+  }
+};
+
+// Exam interfaces
+export interface ExamCreateData {
+  moduleId: string;
+  title: string;
+  examType: string;
+  date: Date;
+  startTime: string;
+  duration: string;
+  location: string;
+  room: string;
+  description?: string;
+  allowedMaterials?: string;
+}
+
+export interface ExamUpdateData {
+  title?: string;
+  examType?: string;
+  date?: Date;
+  startTime?: string;
+  duration?: string;
+  location?: string;
+  room?: string;
+  description?: string;
+  allowedMaterials?: string;
+}
+
+// Get all exams for staff
+export const getExams = async () => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.get('/api/staff/exams', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching exams:', error);
+    throw error;
+  }
+};
+
+// Get a specific exam by ID
+export const getExamById = async (examId: string) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.get(`/api/staff/exams/${examId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching exam ${examId}:`, error);
+    throw error;
+  }
+};
+
+// Create a new exam
+export const createExam = async (examData: ExamCreateData) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.post('/api/staff/exams', 
+      examData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error creating exam:', error);
+    throw error;
+  }
+};
+
+// Update an existing exam
+export const updateExam = async (examId: string, examData: ExamUpdateData) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.put(`/api/staff/exams/${examId}`, 
+      examData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error updating exam:', error);
+    throw error;
+  }
+};
+
+// Delete an exam
+export const deleteExam = async (examId: string) => {
+  try {
+    const authJson = localStorage.getItem('auth');
+    const token = authJson ? JSON.parse(authJson).token : null;
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await axios.delete(`/api/staff/exams/${examId}`, 
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting exam:', error);
+    throw error;
+  }
+};

@@ -458,11 +458,11 @@ const ManageModules: React.FC = () => {
             <DialogTitle>Delete Module</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this module? This action cannot be undone.
-              {selectedModule?.enrolled_students > 0 && (
+              {(selectedModule?.enrolled_students ?? 0) > 0 && (
                 <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   <span className="text-amber-700 text-sm">
-                    This module has {selectedModule?.enrolled_students} enrolled students. Deleting it will mark it as inactive instead.
+                    This module has {selectedModule?.enrolled_students ?? 0} enrolled students. Deleting it will mark it as inactive instead.
                   </span>
                 </div>
               )}

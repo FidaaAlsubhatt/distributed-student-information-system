@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -51,88 +51,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { getAssignmentSubmissions, updateSubmissionGrade } from '@/services/api/staff';
 
-// Mock student submissions for the selected assignment
-const studentSubmissions = [
-  {
-    id: '1',
-    student: {
-      id: '101',
-      name: 'Michael Johnson',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    submissionDate: '2023-04-20T15:30:00',
-    files: [
-      { name: 'database_design.pdf', size: '2.3 MB' },
-      { name: 'er_diagram.png', size: '540 KB' }
-    ],
-    status: 'ungraded',
-    notes: 'Submitted on time'
-  },
-  {
-    id: '2',
-    student: {
-      id: '102',
-      name: 'Emily Davis',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    submissionDate: '2023-04-21T10:15:00',
-    files: [
-      { name: 'database_project.pdf', size: '3.1 MB' }
-    ],
-    status: 'ungraded',
-    notes: 'Submitted on time'
-  },
-  {
-    id: '3',
-    student: {
-      id: '103',
-      name: 'Daniel Wilson',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    submissionDate: '2023-04-21T23:45:00',
-    files: [
-      { name: 'db_design_project.pdf', size: '2.7 MB' },
-      { name: 'queries.sql', size: '120 KB' }
-    ],
-    status: 'graded',
-    grade: '85%',
-    feedback: 'Good work on the database design. Your normalization approach is sound, but there are some issues with the relationships between entities.',
-    notes: 'Submitted on time'
-  },
-  {
-    id: '4',
-    student: {
-      id: '104',
-      name: 'Sophia Martinez',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    submissionDate: '2023-04-22T08:20:00',
-    files: [
-      { name: 'database_assignment.pdf', size: '1.9 MB' }
-    ],
-    status: 'graded',
-    grade: '92%',
-    feedback: 'Excellent work! Your database design is well-structured and your documentation is clear and comprehensive.',
-    notes: 'Submitted on time'
-  },
-  {
-    id: '5',
-    student: {
-      id: '105',
-      name: 'Alexander Brown',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-    },
-    submissionDate: '2023-04-23T14:10:00',
-    files: [
-      { name: 'database_submission.pdf', size: '2.5 MB' },
-      { name: 'schema.sql', size: '95 KB' }
-    ],
-    status: 'late',
-    lateHours: 14,
-    notes: 'Submitted late'
-  }
-];
+// Define interfaces for the component
+// Define minimum required types for the component
+interface Student {
+  id: string;
+  name: string;
+  avatar?: string;
+}
 
 // Form schema for grading
 const gradingSchema = z.object({
@@ -150,18 +77,63 @@ const GradeAssignments: React.FC = () => {
   const [markByPoints, setMarkByPoints] = useState(false);
   const [sliderValue, setSliderValue] = useState([85]);
   
+  // State for storing submissions and assignment details
+  const [assignmentDetails, setAssignmentDetails] = useState<any>(null);
+  const [studentSubmissions, setStudentSubmissions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentAssignmentId, setCurrentAssignmentId] = useState<string>('');
+
+  // Fetch assignment submissions when component mounts
+  useEffect(() => {
+    // Extract assignment ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const id = urlParams.get('id');
+    
+    if (id) {
+      setCurrentAssignmentId(id);
+      fetchAssignmentSubmissions(id);
+    } else {
+      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "No assignment ID provided",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  // Fetch assignment submissions
+  const fetchAssignmentSubmissions = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const response = await getAssignmentSubmissions(id);
+      setAssignmentDetails(response.assignment);
+      setStudentSubmissions(response.submissions);
+      // Department info is available in response.department if needed later
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to load assignment submissions",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Filter submissions based on search and tab
-  const filteredSubmissions = studentSubmissions.filter(submission => {
+  const filteredSubmissions = studentSubmissions ? studentSubmissions.filter((submission: any) => {
     const matchesSearch = !searchTerm || 
-      submission.student.name.toLowerCase().includes(searchTerm.toLowerCase());
+      submission.student_name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = 
       currentTab === 'all' || 
-      (currentTab === 'ungraded' && (submission.status === 'ungraded' || submission.status === 'late')) ||
+      (currentTab === 'ungraded' && (submission.status === 'submitted' || submission.status === 'late')) ||
       (currentTab === 'graded' && submission.status === 'graded');
     
     return matchesSearch && matchesTab;
-  });
+  }) : [];
   
   // Grading form
   const form = useForm<GradingFormValues>({
@@ -173,22 +145,47 @@ const GradeAssignments: React.FC = () => {
   });
   
   // Handle form submission for grading
-  const onSubmit = (data: GradingFormValues) => {
-    console.log({ ...data, studentId: selectedSubmission?.student.id });
-    toast({
-      title: "Assignment Graded",
-      description: `${selectedSubmission?.student.name}'s assignment has been graded successfully.`,
-    });
+  const onSubmit = async (data: GradingFormValues) => {
+    if (!selectedSubmission || !currentAssignmentId) {
+      toast({
+        title: "Error",
+        description: "No submission selected or assignment ID missing",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    // Update the submission in the list (in a real app, this would be an API call)
-    setSelectedSubmission({
-      ...selectedSubmission,
-      status: 'graded',
-      grade: data.grade,
-      feedback: data.feedback,
-    });
-    
-    form.reset();
+    setIsLoading(true);
+    try {
+      // Call the API to update the grade
+      await updateSubmissionGrade(
+        currentAssignmentId,
+        selectedSubmission.student_id,
+        data.grade,
+        data.feedback
+      );
+      
+      // Refresh the submissions list
+      await fetchAssignmentSubmissions(currentAssignmentId);
+      
+      toast({
+        title: "Assignment Graded",
+        description: `${selectedSubmission.student_name}'s assignment has been graded successfully.`,
+      });
+      
+      // Reset form and close
+      form.reset();
+      setSelectedSubmission(null);
+    } catch (error) {
+      console.error("Error updating grade:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update the grade. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   // Handle selecting a submission to grade
@@ -196,20 +193,36 @@ const GradeAssignments: React.FC = () => {
     setSelectedSubmission(submission);
     
     // Pre-fill form if the submission has been graded
-    if (submission.status === 'graded') {
-      form.setValue('grade', submission.grade.replace('%', ''));
-      form.setValue('feedback', submission.feedback);
+    if (submission.grade) {
+      form.setValue('grade', submission.grade);
+      form.setValue('feedback', submission.feedback || '');
     } else {
-      // For ungraded submissions, set default values
-      form.setValue('grade', markByPoints ? '85' : sliderValue[0].toString());
-      form.setValue('feedback', '');
+      form.reset();
     }
   };
   
   // Handle slider change
   const handleSliderChange = (value: number[]) => {
     setSliderValue(value);
-    form.setValue('grade', value[0].toString());
+    // Convert percentage to points if needed
+    if (markByPoints && assignmentDetails?.total_marks) {
+      const pointValue = (value[0] / 100) * assignmentDetails.total_marks;
+      form.setValue('grade', pointValue.toFixed(2));
+    } else {
+      form.setValue('grade', value[0].toString());
+    }
+  };
+  
+  // Handle points change
+  const handlePointsChange = (value: string) => {
+    if (assignmentDetails?.total_marks) {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0 && numValue <= assignmentDetails.total_marks) {
+        const percentage = Math.round((numValue / assignmentDetails.total_marks) * 100);
+        setSliderValue([percentage]);
+        form.setValue('grade', value);
+      }
+    }
   };
   
   // Get status color
@@ -226,53 +239,59 @@ const GradeAssignments: React.FC = () => {
     }
   };
   
-  // Mock assignment details
-  const assignmentDetails = {
-    title: 'Database Design Project',
-    module: 'Database Systems',
-    moduleCode: 'CS301',
-    dueDate: '2023-04-22T23:59:00',
-    totalMarks: 100,
-    description: 'Design a relational database for a university management system.',
-    instructions: 'Submit your work as a PDF document with an ER diagram and schema design.',
-    status: 'active',
-    totalSubmissions: studentSubmissions.length,
-    gradedSubmissions: studentSubmissions.filter(s => s.status === 'graded').length,
-  };
+  // Calculate stats for the assignment
+  const totalSubmissions = studentSubmissions?.length || 0;
+  const gradedSubmissions = studentSubmissions ? studentSubmissions.filter((s: any) => s.status === 'graded').length : 0;
+  const submittedCount = studentSubmissions ? studentSubmissions.filter((s: any) => s.status !== 'unsubmitted').length : 0;
+  const unsubmittedCount = studentSubmissions ? studentSubmissions.filter((s: any) => s.status === 'unsubmitted').length : 0;
+  const lateSubmissions = studentSubmissions ? studentSubmissions.filter((s: any) => s.status === 'late').length : 0;
+  
+  // Calculate the average grade if there are graded assignments
+  const completionPercentage = totalSubmissions > 0 ? Math.round((submittedCount / totalSubmissions) * 100) : 0;
+  const gradingProgress = totalSubmissions > 0 ? Math.round((gradedSubmissions / totalSubmissions) * 100) : 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {isLoading && (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
+            <span className="ml-3">Loading assignment data...</span>
+          </div>
+        )}
+        
         <div className="flex items-center gap-4">
           <Link href="/manage-assignments">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">{assignmentDetails.title}</h2>
-            <p className="text-sm text-gray-500">{assignmentDetails.module} ({assignmentDetails.moduleCode})</p>
-          </div>
+          <h1 className="text-2xl font-bold">
+            {assignmentDetails?.title || 'Assignment Grading'}
+          </h1>
         </div>
+        {assignmentDetails && (
+          <p className="text-sm text-gray-500">{assignmentDetails.module_title} ({assignmentDetails.module_code})</p>
+        )}
         
         {/* Assignment Info and Progress Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Assignment Due Date</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-blue-100 text-blue-700 mr-3">
-                  <Calendar className="h-5 w-5" />
+          {assignmentDetails && (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-6">
+                <div className="flex items-center justify-center bg-blue-100 rounded-full p-3 mb-4">
+                  <Calendar className="h-6 w-6 text-blue-600" />
                 </div>
-                <div>
-                  <p className="font-medium">{format(new Date(assignmentDetails.dueDate), 'PPP')}</p>
-                  <p className="text-sm text-gray-500">{format(new Date(assignmentDetails.dueDate), 'p')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <h3 className="font-medium mb-1">Due Date</h3>
+                <p className="text-2xl font-bold text-center">
+                  {format(new Date(assignmentDetails.due_date), 'd MMMM yyyy')}
+                </p>
+                <p className="text-sm text-gray-500">
+                  at {format(new Date(assignmentDetails.due_date), 'h:mm a')}
+                </p>
+              </CardContent>
+            </Card>
+          )}
           
           <Card>
             <CardHeader className="pb-2">
@@ -284,10 +303,43 @@ const GradeAssignments: React.FC = () => {
                   <ThumbsUp className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium">{assignmentDetails.totalSubmissions} Students</p>
+                  <p className="font-medium">{totalSubmissions} Students</p>
                   <p className="text-sm text-gray-500">
-                    {studentSubmissions.filter(s => s.status === 'late').length} submitted late
+                    {lateSubmissions} submitted late
                   </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Submission Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Progress value={completionPercentage} className="h-2 mb-2" />
+              <div className="flex justify-between text-sm">
+                <span>{submittedCount} submitted</span>
+                <span>out of {totalSubmissions}</span>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="flex items-center">
+                    <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span> On Time
+                  </span>
+                  <span>{submittedCount - lateSubmissions}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="flex items-center">
+                    <span className="h-2 w-2 rounded-full bg-yellow-500 mr-1"></span> Late
+                  </span>
+                  <span>{lateSubmissions}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="flex items-center">
+                    <span className="h-2 w-2 rounded-full bg-gray-300 mr-1"></span> Not Submitted
+                  </span>
+                  <span>{unsubmittedCount}</span>
                 </div>
               </div>
             </CardContent>
@@ -297,16 +349,21 @@ const GradeAssignments: React.FC = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Grading Progress</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent>
+              <Progress value={gradingProgress} className="h-2 mb-2" />
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Progress</span>
-                <span className="font-medium">
-                  {assignmentDetails.gradedSubmissions}/{assignmentDetails.totalSubmissions} ({
-                    Math.round((assignmentDetails.gradedSubmissions / assignmentDetails.totalSubmissions) * 100)
-                  }%)
-                </span>
+                <span>{gradedSubmissions} graded</span>
+                <span>out of {submittedCount}</span>
               </div>
-              <Progress value={(assignmentDetails.gradedSubmissions / assignmentDetails.totalSubmissions) * 100} />
+              <div className="mt-4">
+                <p className="text-sm text-gray-500">
+                  {gradingProgress === 100 ? (
+                    <span className="text-green-600 font-medium">All submissions have been graded</span>
+                  ) : (
+                    <span>{submittedCount - gradedSubmissions} submissions left to grade</span>
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -569,19 +626,17 @@ const GradeAssignments: React.FC = () => {
                             name="grade"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Points (out of {assignmentDetails.totalMarks})</FormLabel>
+                                <FormLabel>Points</FormLabel>
                                 <FormControl>
                                   <Input 
                                     type="number" 
                                     min="0" 
-                                    max={assignmentDetails.totalMarks} 
-                                    {...field} 
+                                    max={assignmentDetails?.total_marks} 
+                                    step="0.5"
+                                    {...field}
                                     onChange={(e) => {
-                                      field.onChange(e);
-                                      const value = parseInt(e.target.value);
-                                      if (!isNaN(value) && value >= 0 && value <= assignmentDetails.totalMarks) {
-                                        setSliderValue([Math.round((value / assignmentDetails.totalMarks) * 100)]);
-                                      }
+                                      field.onChange(e.target.value);
+                                      handlePointsChange(e.target.value);
                                     }}
                                   />
                                 </FormControl>

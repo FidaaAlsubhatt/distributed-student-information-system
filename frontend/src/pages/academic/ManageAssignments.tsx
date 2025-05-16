@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TableList from '@/components/dashboard/TableList';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
 import {
@@ -21,35 +20,82 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
+  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { 
   PlusCircle, 
   Pencil, 
   Trash2, 
-  FileText, 
-  Upload,
-  CheckSquare
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { assignments, modules } from '@/data/mockData';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
+import {
+  getAssignments,
+  getAcademicModules,
+  createAssignment,
+  updateAssignment,
+  deleteAssignment,
+  AssignmentCreateData,
+  AssignmentUpdateData
+} from '@/services/api/staff';
+
+// Define interfaces
+interface Assignment {
+  id: string;
+  assignment_id?: string;  // Alternative ID field from database
+  title: string;
+  description: string;
+  instructions: string;
+  total_marks: number;
+  weight: number;
+  created_at: string;
+  due_date: string;
+  dueDate?: string; // For backward compatibility with existing code
+  module: string;
+  moduleCode: string;
+  module_id: string;
+  module_code?: string; // For backward compatibility
+  module_title?: string; // For backward compatibility
+  submission_count?: number;
+  enrolled_students?: number;
+  status: 'upcoming' | 'due_soon' | 'due_today' | 'overdue' | 'submitted' | 'partially_graded' | 'fully_graded';
+}
+
+interface Module {
+  module_id: string;
+  code: string;
+  title: string;
+  status: string;
+  name?: string;
+}
+
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+// Form schema
 const assignmentFormSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters" }),
-  moduleCode: z.string().min(1, { message: "Module is required" }),
+  moduleId: z.string().min(1, { message: "Module is required" }),
   dueDate: z.date({
     required_error: "Due date is required",
   }),
   totalMarks: z.string().min(1, { message: "Total marks are required" }).refine(
     (val) => !isNaN(parseInt(val)), { message: "Total marks must be a number" }
+  ),
+  weight: z.string().min(1, { message: "Weight percentage is required" }).refine(
+    (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) <= 100, 
+    { message: "Weight must be a number between 1 and 100" }
   ),
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   instructions: z.string().min(10, { message: "Instructions must be at least 10 characters" }),
@@ -59,521 +105,362 @@ type FormValues = z.infer<typeof assignmentFormSchema>;
 
 const ManageAssignments: React.FC = () => {
   const { toast } = useToast();
-  const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // State
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [modules, setModules]         = useState<Module[]>([]);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string|null>(null);
+
+  const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isEditOpen, setEditOpen]     = useState(false);
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
+  const [selected, setSelected]       = useState<Assignment|null>(null);
+  
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModule, setSelectedModule] = useState('all');
-  
-  const pendingAssignments = assignments.filter(assignment => assignment.status === 'pending');
-  const submittedAssignments = assignments.filter(assignment => assignment.status === 'submitted');
-  const gradedAssignments = assignments.filter(assignment => assignment.status === 'graded');
-  
-  // Filter assignments based on search and module
-  const filterAssignments = (assignmentList: typeof assignments) => {
-    if (!searchTerm && selectedModule === 'all') return assignmentList;
-    
-    return assignmentList.filter(assignment => {
-      const matchesSearch = !searchTerm || 
-        assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        assignment.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        assignment.moduleCode.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesModule = selectedModule === 'all' || assignment.moduleCode === selectedModule;
-      
-      return matchesSearch && matchesModule;
-    });
-  };
-  
-  // New assignment form
+
+  // Fetch both lists once on mount
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [{ assignments }, { modules }] = await Promise.all([
+          getAssignments(),
+          getAcademicModules()
+        ]);
+        setAssignments(assignments);
+        setModules(modules);
+      } catch (e) {
+        setError('Unable to load data');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  // Form hooks (reuse one schema for create & edit)
   const form = useForm<FormValues>({
     resolver: zodResolver(assignmentFormSchema),
     defaultValues: {
       title: '',
-      moduleCode: '',
+      moduleId: '',
       dueDate: new Date(),
       totalMarks: '',
+      weight: '',
       description: '',
-      instructions: '',
-    },
+      instructions: ''
+    }
   });
-  
-  // Edit assignment form
-  const editForm = useForm<FormValues>({
-    resolver: zodResolver(assignmentFormSchema),
-    defaultValues: {
-      title: '',
-      moduleCode: '',
-      dueDate: new Date(),
-      totalMarks: '',
-      description: '',
-      instructions: '',
-    },
+
+  // Create handler
+  const handleCreate = async (data: FormValues) => {
+    setLoading(true);
+    try {
+      const createData: AssignmentCreateData = {
+        title: data.title,
+        moduleId: data.moduleId,
+        dueDate: data.dueDate,
+        totalMarks: data.totalMarks,
+        weight: data.weight,
+        description: data.description,
+        instructions: data.instructions
+      };
+      await createAssignment(createData);
+      const { assignments } = await getAssignments();
+      setAssignments(assignments);
+      toast({ title: 'Assignment created successfully' });
+      setCreateOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error('Error creating assignment:', error);
+      toast({ title: 'Failed to create assignment', variant:'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update handler
+  const handleUpdate = async (data: FormValues) => {
+    if (!selected) return;
+    setLoading(true);
+    try {
+      const updateData: AssignmentUpdateData = {
+        title: data.title,
+        dueDate: data.dueDate,
+        totalMarks: data.totalMarks,
+        weight: data.weight,
+        description: data.description,
+        instructions: data.instructions
+      };
+      
+      // Make sure we're using the correct ID field - could be id or assignment_id
+      const assignmentId = selected.id || selected.assignment_id;
+      
+      if (!assignmentId) {
+        throw new Error('Assignment ID is undefined');
+      }
+      
+      await updateAssignment(assignmentId, updateData);
+      const { assignments } = await getAssignments();
+      setAssignments(assignments);
+      toast({ title: 'Assignment updated successfully' });
+      setEditOpen(false);
+    } catch (error) {
+      console.error('Error updating assignment:', error);
+      toast({ title: 'Failed to update assignment', variant:'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete handler
+  const handleDelete = async () => {
+    if (!selected) return;
+    setLoading(true);
+    try {
+      // Make sure we're using the correct ID field - could be id or assignment_id
+      const assignmentId = selected.id || selected.assignment_id;
+      
+      if (!assignmentId) {
+        throw new Error('Assignment ID is undefined');
+      }
+      
+      await deleteAssignment(assignmentId);
+      const { assignments } = await getAssignments();
+      setAssignments(assignments);
+      toast({ title: 'Assignment deleted successfully' });
+      setDeleteOpen(false);
+      setSelected(null);
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      toast({ title: 'Failed to delete assignment', variant:'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter assignments based on search term and selected module
+  const filteredAssignments = assignments.filter(assignment => {
+    const moduleCode = assignment.module_code || assignment.moduleCode || '';
+    const matchesSearch = assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        moduleCode.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesModule = selectedModule === 'all' || 
+                         assignment.module_id === selectedModule;
+    return matchesSearch && matchesModule;
   });
-  
-  // Handle form submission for new assignment
-  const onSubmit = (data: FormValues) => {
-    console.log(data);
-    toast({
-      title: "Assignment Created",
-      description: `Assignment "${data.title}" has been created successfully.`,
-    });
-    setIsCreateDialogOpen(false);
-    form.reset();
-  };
-  
-  // Handle form submission for edit assignment
-  const onEditSubmit = (data: FormValues) => {
-    console.log(data);
-    toast({
-      title: "Assignment Updated",
-      description: `Assignment "${data.title}" has been updated successfully.`,
-    });
-    setIsEditDialogOpen(false);
-    editForm.reset();
-  };
-  
-  // Open the edit dialog and populate form with assignment data
-  const handleEditAssignment = (assignment: any) => {
-    setSelectedAssignment(assignment);
-    editForm.setValue('title', assignment.title);
-    editForm.setValue('moduleCode', assignment.moduleCode);
-    editForm.setValue('dueDate', new Date(assignment.dueDate));
-    editForm.setValue('totalMarks', '100');
-    editForm.setValue('description', 'Complete the assigned tasks and submit your work following the provided instructions.');
-    editForm.setValue('instructions', 'Submit your work as a PDF document. Include your name and student ID in the filename.');
-    setIsEditDialogOpen(true);
-  };
-  
-  // Assignment details dialog content
-  const AssignmentDetailsContent = ({ assignment }: { assignment: any }) => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">{assignment.title}</h2>
-          <p className="text-gray-500">{assignment.module} ({assignment.moduleCode})</p>
-        </div>
-        <Badge 
-          className={
-            assignment.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-            assignment.status === 'submitted' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-            'bg-green-100 text-green-800 border-green-200'
-          }
-        >
-          {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-        </Badge>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4 text-sm border-t pt-4">
-        <div>
-          <p className="text-gray-500">Due Date</p>
-          <p className="font-medium">{format(new Date(assignment.dueDate), 'PPP')}</p>
-        </div>
-        <div>
-          <p className="text-gray-500">Due Time</p>
-          <p className="font-medium">{format(new Date(assignment.dueDate), 'p')}</p>
-        </div>
-        <div>
-          <p className="text-gray-500">Total Marks</p>
-          <p className="font-medium">100</p>
-        </div>
-        <div>
-          <p className="text-gray-500">Submissions</p>
-          <p className="font-medium">{assignment.submissionCount || 0}</p>
-        </div>
-      </div>
-      
-      <div className="border-t pt-4">
-        <p className="text-gray-500">Description</p>
-        <p className="mt-1">
-          Complete the assigned tasks and submit your work following the provided instructions.
-        </p>
-      </div>
-      
-      <div className="border-t pt-4">
-        <p className="text-gray-500">Instructions</p>
-        <p className="mt-1">Submit your work as a PDF document. Include your name and student ID in the filename.</p>
-      </div>
-      
-      <div className="border-t pt-4 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => handleEditAssignment(assignment)}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit Assignment
-        </Button>
-        <Button variant="destructive" className="flex-1">
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete Assignment
-        </Button>
-      </div>
-    </div>
-  );
-  
-  // Columns for assignment table
-  const assignmentColumns = [
+
+  // Module filter options
+  const moduleOptions: FilterOption[] = [
+    { value: 'all', label: 'All Modules' },
+    ...modules.map(module => ({
+      value: module.module_id,
+      label: `${module.code}: ${module.title}`
+    }))
+  ];
+
+  // Columns definition for TableList
+  const columns = [
     {
       key: 'title',
-      header: 'Assignment',
-      cell: (assignment: any) => (
+      header: 'Title',
+      accessor: 'title',
+      cell: (assignment: Assignment) => (
         <div>
-          <span className="font-medium text-gray-900">{assignment.title}</span>
-          <p className="text-sm text-gray-500">{assignment.module} ({assignment.moduleCode})</p>
+          <div className="font-medium">{assignment.title}</div>
+          <div className="text-sm text-muted-foreground">{assignment.module_code || assignment.moduleCode}</div>
         </div>
       )
     },
     {
-      key: 'dueDate',
+      key: 'due_date',
       header: 'Due Date',
-      cell: (assignment: any) => (
-        <span className="text-gray-500">
-          {format(new Date(assignment.dueDate), 'PP')}
-          <p className="text-xs">{format(new Date(assignment.dueDate), 'p')}</p>
-        </span>
-      )
-    },
-    {
-      key: 'submissions',
-      header: 'Submissions',
-      cell: (assignment: any) => (
-        <span className="text-gray-700 font-medium">
-          {assignment.submissionCount || 0}
-        </span>
-      )
+      accessor: 'due_date',
+      cell: (assignment: Assignment) => {
+        const dateString = assignment.due_date || assignment.dueDate || '';
+        try {
+          return <div>{format(parseISO(dateString), 'dd MMM yyyy')}</div>
+        } catch (e) {
+          console.error(`Error formatting date: ${dateString}`, e);
+          return <div className="text-gray-500">Date unavailable</div>
+        }
+      }
     },
     {
       key: 'status',
       header: 'Status',
-      cell: (assignment: any) => {
-        let badgeClass = '';
-        let badgeText = '';
+      accessor: 'status',
+      cell: (assignment: Assignment) => {
+        let color = '';
+        let displayText = '';
         
-        switch (assignment.status) {
-          case 'pending':
-            badgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            badgeText = 'Pending';
+        switch(assignment.status) {
+          case 'upcoming': 
+            color = 'bg-slate-100 text-slate-800'; 
+            displayText = 'Upcoming';
             break;
-          case 'submitted':
-            badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
-            badgeText = 'Submitted';
+          case 'due_soon': 
+            color = 'bg-yellow-100 text-yellow-800'; 
+            displayText = 'Due Soon';
             break;
-          case 'graded':
-            badgeClass = 'bg-green-100 text-green-800 border-green-200';
-            badgeText = 'Graded';
+          case 'due_today': 
+            color = 'bg-orange-100 text-orange-800'; 
+            displayText = 'Due Today';
             break;
+          case 'overdue': 
+            color = 'bg-red-100 text-red-800'; 
+            displayText = 'Overdue';
+            break;
+          case 'partially_graded': 
+            color = 'bg-blue-100 text-blue-800'; 
+            displayText = 'Partially Graded';
+            break;
+          case 'fully_graded': 
+            color = 'bg-green-100 text-green-800'; 
+            displayText = 'Fully Graded';
+            break;
+          default:
+            color = 'bg-gray-100 text-gray-800';
+            // Handle any status value safely with type check
+            displayText = typeof assignment.status === 'string' 
+              ? assignment.status.replace(/_/g, ' ')
+                .replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : 'Unknown';
         }
         
         return (
-          <Badge 
-            variant="outline" 
-            className={`${badgeClass} px-2 font-semibold rounded-full`}
-          >
-            {badgeText}
+          <Badge className={color}>
+            {displayText}
           </Badge>
         );
       }
     },
     {
+      key: 'submissions',
+      header: 'Submissions',
+      accessor: 'submission_count',
+      cell: (assignment: Assignment) => (
+        <div>{assignment.submission_count} / {assignment.enrolled_students}</div>
+      )
+    },
+    {
       key: 'actions',
       header: 'Actions',
-      cell: (assignment: any) => (
+      accessor: 'assignment_id',
+      cell: (assignment: Assignment) => (
         <div className="flex space-x-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-primary hover:text-primary/80">
-                <FileText className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Assignment Details</DialogTitle>
-                <DialogDescription>View detailed information about this assignment.</DialogDescription>
-              </DialogHeader>
-              <AssignmentDetailsContent assignment={assignment} />
-            </DialogContent>
-          </Dialog>
-          
           <Button 
             variant="ghost" 
             size="icon" 
-            className="text-green-600 hover:text-green-700"
-            onClick={() => window.location.href = '/grade-assignments'}
-          >
-            <CheckSquare className="h-4 w-4" />
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-blue-600 hover:text-blue-700"
-            onClick={() => handleEditAssignment(assignment)}
+            onClick={() => {
+              setSelected(assignment);
+              form.reset({
+                title: assignment.title,
+                moduleId: assignment.module_id,
+                dueDate: parseISO(assignment.due_date),
+                totalMarks: assignment.total_marks.toString(),
+                weight: assignment.weight ? assignment.weight.toString() : '25',
+                description: assignment.description,
+                instructions: assignment.instructions
+              });
+              setEditOpen(true);
+            }}
           >
             <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => {
+              setSelected(assignment);
+              setDeleteOpen(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       )
     }
   ];
-  
-  // Module options for filter
-  const moduleOptions = [
-    { value: 'all', label: 'All Modules' },
-    ...modules
-      .filter(module => module.status === 'active')
-      .map(module => ({
-        value: module.code,
-        label: `${module.code} - ${module.name}`
-      }))
-  ];
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">Manage Assignments</h2>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Create Assignment
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create New Assignment</DialogTitle>
-                <DialogDescription>
-                  Add a new assignment for your students. Fill in all the required information below.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Assignment Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Database Design Project" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="moduleCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Module</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select module" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {modules
-                              .filter(module => module.status === 'active')
-                              .map(module => (
-                                <SelectItem key={module.id} value={module.code}>
-                                  {module.code} - {module.name}
-                                </SelectItem>
-                              ))
-                            }
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="dueDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Due Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className="w-full pl-3 text-left font-normal"
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="totalMarks"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Total Marks</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g. 100" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Provide a detailed description of the assignment..."
-                            className="resize-none h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="instructions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Submission Instructions</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Provide clear instructions for submission..."
-                            className="resize-none h-20"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="border rounded-md p-4">
-                    <FormLabel className="mb-2 block">Attachment (Optional)</FormLabel>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500 mb-2">Drag and drop files here, or click to select files</p>
-                      <p className="text-xs text-gray-400">
-                        Supported formats: PDF, DOC, DOCX, ZIP (Max: 10MB)
-                      </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-4"
-                      >
-                        Select Files
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit">Create Assignment</Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+      <div className="flex justify-between mb-4">
+        <h2 className="text-2xl font-bold">Manage Assignments</h2>
+        <Button onClick={() => {
+          form.reset(); // Reset form when opening create dialog
+          setCreateOpen(true);
+        }}>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          New Assignment
+        </Button>
+      </div>
+
+      {error && <div className="text-red-600 mb-4">{error}</div>}
+      
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search by title or module code..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        
-        <Tabs defaultValue="pending" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending">Pending ({pendingAssignments.length})</TabsTrigger>
-            <TabsTrigger value="submitted">Submitted ({submittedAssignments.length})</TabsTrigger>
-            <TabsTrigger value="graded">Graded ({gradedAssignments.length})</TabsTrigger>
-          </TabsList>
+        <div className="w-full md:w-64">
+          <Select 
+            value={selectedModule} 
+            onValueChange={setSelectedModule}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by module" />
+            </SelectTrigger>
+            <SelectContent>
+              {moduleOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <TableList
+          data={filteredAssignments}
+          columns={columns}
+        />
+      )}
+
+      {/* Create Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Create New Assignment</DialogTitle>
+            <DialogDescription>
+              Add a new assignment for your module. Fill in all the required details below.
+            </DialogDescription>
+          </DialogHeader>
           
-          <TabsContent value="pending" className="mt-6">
-            <TableList
-              columns={assignmentColumns}
-              data={filterAssignments(pendingAssignments)}
-              showSearch={true}
-              searchPlaceholder="Search assignments..."
-              showFilter={true}
-              filterOptions={moduleOptions}
-              filterPlaceholder="All Modules"
-              onSearchChange={setSearchTerm}
-              onFilterChange={setSelectedModule}
-            />
-          </TabsContent>
-          
-          <TabsContent value="submitted" className="mt-6">
-            <TableList
-              columns={assignmentColumns}
-              data={filterAssignments(submittedAssignments)}
-              showSearch={true}
-              searchPlaceholder="Search assignments..."
-              showFilter={true}
-              filterOptions={moduleOptions}
-              filterPlaceholder="All Modules"
-              onSearchChange={setSearchTerm}
-              onFilterChange={setSelectedModule}
-            />
-          </TabsContent>
-          
-          <TabsContent value="graded" className="mt-6">
-            <TableList
-              columns={assignmentColumns}
-              data={filterAssignments(gradedAssignments)}
-              showSearch={true}
-              searchPlaceholder="Search assignments..."
-              showFilter={true}
-              filterOptions={moduleOptions}
-              filterPlaceholder="All Modules"
-              onSearchChange={setSearchTerm}
-              onFilterChange={setSelectedModule}
-            />
-          </TabsContent>
-        </Tabs>
-        
-        {/* Edit Assignment Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Edit Assignment</DialogTitle>
-              <DialogDescription>
-                Update the assignment information. Changes will be reflected immediately.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
-                  control={editForm.control}
+                  control={form.control}
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assignment Title</FormLabel>
+                      <FormLabel>Title</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input placeholder="Assignment title" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -581,129 +468,357 @@ const ManageAssignments: React.FC = () => {
                 />
                 
                 <FormField
-                  control={editForm.control}
-                  name="moduleCode"
+                  control={form.control}
+                  name="moduleId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Module</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select module" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {modules
-                            .filter(module => module.status === 'active')
-                            .map(module => (
-                              <SelectItem key={module.id} value={module.code}>
-                                {module.code} - {module.name}
-                              </SelectItem>
-                            ))
-                          }
+                          {modules.map(module => (
+                            <SelectItem key={module.module_id} value={module.module_id}>
+                              {module.code}: {module.title}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Due Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className="w-full pl-3 text-left font-normal"
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="dueDate"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Due Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className="w-full pl-3 text-left font-normal"
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={editForm.control}
-                    name="totalMarks"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Marks</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="totalMarks"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Marks</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                  control={form.control}
+                  name="weight"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight (% of module grade)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" max="100" step="0.1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <FormDescription>
+                        The percentage this assignment contributes to the final module grade
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Brief description of the assignment" 
+                        className="min-h-[80px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="instructions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instructions</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Detailed instructions for students" 
+                        className="min-h-[120px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Assignment
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Assignment</DialogTitle>
+            <DialogDescription>
+              Update the assignment details below.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Assignment title" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="moduleId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Module</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select module" />
+                          </SelectTrigger>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
+                        <SelectContent>
+                          {modules.map(module => (
+                            <SelectItem key={module.module_id} value={module.module_id}>
+                              {module.code}: {module.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
-                  control={editForm.control}
-                  name="description"
+                  control={form.control}
+                  name="dueDate"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          className="resize-none h-20"
-                          {...field}
-                        />
-                      </FormControl>
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Due Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className="w-full pl-3 text-left font-normal"
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
                 <FormField
-                  control={editForm.control}
-                  name="instructions"
+                  control={form.control}
+                  name="totalMarks"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Submission Instructions</FormLabel>
+                      <FormLabel>Total Marks</FormLabel>
                       <FormControl>
-                        <Textarea
-                          className="resize-none h-20"
-                          {...field}
-                        />
+                        <Input type="number" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save Changes</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              </div>
+
+              <FormField
+                  control={form.control}
+                  name="weight"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight (% of module grade)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" max="100" step="0.1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <FormDescription>
+                        The percentage this assignment contributes to the final module grade
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Brief description of the assignment" 
+                        className="min-h-[80px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="instructions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instructions</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Detailed instructions for students" 
+                        className="min-h-[120px]" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update Assignment
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={isDeleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Assignment</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this assignment? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <div className="py-4">
+              <p className="font-medium">{selected.title}</p>
+              <p className="text-sm text-muted-foreground">{selected.module_code}: {selected.module_title}</p>
+              <div className="mt-2 flex gap-4">
+                <span className="text-sm">Due: {format(parseISO(selected.due_date), 'dd MMM yyyy')}</span>
+                <span className="text-sm">Marks: {selected.total_marks}</span>
+                <span className="text-sm">Weight: {selected.weight || 25}%</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

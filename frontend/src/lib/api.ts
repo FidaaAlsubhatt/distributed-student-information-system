@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { User } from '@/contexts/UserContext';
 
 // Define user role type
 export type UserRole = 'student' | 'academic_staff' | 'department_admin' | 'central_admin';
@@ -14,11 +13,16 @@ export interface DepartmentRole {
 }
 
 // Define user data type
-export interface UserData extends User {
+export interface UserData {
   id: string;
   userId?: string; // Added for compatibility with UserContext
   username?: string; // Added for compatibility with UserContext
   avatar?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  gender?: string;
+  dateOfBirth?: string;
   studentNumber?: string;
   yearOfStudy?: number;
   staffId?: string;
@@ -161,19 +165,45 @@ export const api = {
 
   // Students
   addStudent: async (studentData: StudentFormData, departmentCode: string): Promise<any> => {
-    return apiRequest('POST', '/api/students', studentData, departmentCode);
+    return apiRequest('POST', '/api/department/users/student', studentData, departmentCode);
   },
 
   getStudents: async (departmentCode: string) => {
-    return apiRequest<any[]>('GET', '/api/department/students', undefined, departmentCode);
+    return apiRequest<any[]>('GET', '/api/department/users/student', undefined, departmentCode);
+  },
+  
+  getDepartmentStudents: async (departmentCode: string) => {
+    return apiRequest<any[]>('GET', '/api/department/users/student', undefined, departmentCode);
+  },
+  
+  updateStudent: async (id: string, studentData: any, departmentCode: string): Promise<any> => {
+    // Fixed URL pattern to match what the backend expects
+    return apiRequest('PUT', `/api/department/users/${'student'}/${id}`, studentData, departmentCode);
+  },
+  
+  deleteStudent: async (studentId: string, departmentCode: string): Promise<any> => {
+    return apiRequest('DELETE', `/api/department/users/student/${studentId}`, undefined, departmentCode);
   },
 
   // Academic staff
   addAcademicStaff: async (staffData: AcademicStaffFormData, departmentCode: string): Promise<any> => {
-    return apiRequest('POST', '/api/academic-staff', staffData, departmentCode);
+    return apiRequest('POST', '/api/department/users/staff', staffData, departmentCode);
   },
 
-  // Department users
+  getDepartmentStaff: async (departmentCode: string) => {
+    return apiRequest<any[]>('GET', '/api/department/users/staff', undefined, departmentCode);
+  },
+  
+  updateStaff: async (id: string, staffData: any, departmentCode: string): Promise<any> => {
+    // Fixed URL pattern to match what the backend expects
+    return apiRequest('PUT', `/api/department/users/${'staff'}/${id}`, staffData, departmentCode);
+  },
+
+  deleteStaff: async (staffId: string, departmentCode: string): Promise<any> => {
+    return apiRequest('DELETE', `/api/department/users/staff/${staffId}`, undefined, departmentCode);
+  },
+
+  // Department users - generic endpoint for all users
   getDepartmentUsers: async (departmentCode: string): Promise<UserData[]> => {
     return apiRequest('GET', '/api/department/users', undefined, departmentCode);
   },

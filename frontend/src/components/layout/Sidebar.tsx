@@ -250,8 +250,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             children: [
               { name: 'Manage Students', id: '/manage-students' },
               { name: 'Manage Staff', id: '/manage-staff' },
-              { name: 'Assign Roles', id: '/assign-roles' },
-              { name: 'Manage Admins', id: '/manage-admins' },
+            ],
+          },
+          {
+            name: 'Manage Programs',
+            icon: 'fa-solid fa-book',
+            id: 'manage-programs',
+            children: [
+              { name: 'Manage Programs', id: '/manage-programs' },
             ],
           },
           {

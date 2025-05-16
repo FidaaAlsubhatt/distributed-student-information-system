@@ -103,9 +103,7 @@ CREATE TABLE module_prerequisites (
   UNIQUE(module_id, prereq_id)
 );
 
--- 4. Enrollments and Assessment
-
-CREATE TABLE enrollments (
+-CREATE TABLE enrollments (
   enrollment_id SERIAL PRIMARY KEY,
   student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
   module_id INT REFERENCES modules(module_id) ON DELETE CASCADE,
@@ -119,7 +117,11 @@ CREATE TABLE assignments (
   module_id INT REFERENCES modules(module_id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
-  due_date DATE NOT NULL
+  due_date DATE NOT NULL,
+  instructions TEXT,
+  total_marks INT NOT NULL DEFAULT 100,
+  weight NUMERIC(5,2) NOT NULL DEFAULT 1.0,
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE submissions (
@@ -128,8 +130,17 @@ CREATE TABLE submissions (
   student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
   file_path TEXT,
   submitted_at TIMESTAMP DEFAULT NOW(),
-  grade NUMERIC(5,2),
-  feedback TEXT
+  status VARCHAR(20) DEFAULT 'submitted'
+);
+
+CREATE TABLE assignment_grades (
+  grade_id SERIAL PRIMARY KEY,
+  submission_id INT REFERENCES submissions(submission_id) ON DELETE CASCADE,
+  staff_id INT REFERENCES staff(user_id) ON DELETE SET NULL,
+  grade NUMERIC(5,2) NOT NULL,
+  feedback TEXT,
+  graded_at TIMESTAMP DEFAULT NOW(),
+  revision_number INT DEFAULT 1
 );
 
 CREATE TABLE module_grades (

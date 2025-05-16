@@ -17,12 +17,15 @@ interface Assignment {
   module: string;
   moduleCode: string;
   dueDate: string;
-  status: 'pending' | 'submitted' | 'graded';
+  status: 'upcoming' | 'due_soon' | 'due_today' | 'overdue' | 'submitted' | 'partially_graded' | 'fully_graded';
   grade?: string | null;
   feedback?: string | null;
   submittedAt?: string | null;
   filePath?: string | null;
-  // Add any other fields that might be necessary
+  description?: string;
+  instructions?: string;
+  totalMarks?: number;
+  weight?: number;
   submissionCount?: number;
 }
 
@@ -87,9 +90,15 @@ const ViewAssignments: React.FC = () => {
   }, [isAuthenticated]);
   
   // Filter assignments based on status
-  const pendingAssignments = assignments.filter(assignment => assignment.status === 'pending');
-  const submittedAssignments = assignments.filter(assignment => assignment.status === 'submitted');
-  const gradedAssignments = assignments.filter(assignment => assignment.status === 'graded');
+  const pendingAssignments = assignments.filter(assignment => 
+    ['upcoming', 'due_soon', 'due_today', 'overdue'].includes(assignment.status)
+  );
+  const submittedAssignments = assignments.filter(assignment => 
+    assignment.status === 'submitted'
+  );
+  const gradedAssignments = assignments.filter(assignment => 
+    ['partially_graded', 'fully_graded'].includes(assignment.status)
+  );
 
   // Filter by search term and module code
   const filterAssignments = (assignmentList: Assignment[]) => {
@@ -124,11 +133,33 @@ const ViewAssignments: React.FC = () => {
     {
       key: 'dueDate',
       header: 'Due Date',
-      cell: (assignment: Assignment) => (
-        <span className="text-gray-500">
-          {assignment.dueDate ? format(new Date(assignment.dueDate), 'PPp') : 'No due date'}
-        </span>
-      )
+      cell: (assignment: Assignment) => {
+        // Format the date properly using date-fns
+        if (!assignment.dueDate) {
+          return <span className="text-gray-500">No due date</span>;
+        }
+        
+        try {
+          // Make sure the date is valid before formatting
+          const dateObj = new Date(assignment.dueDate);
+          
+          // Check if date is valid (will be Invalid Date if parsing fails)
+          if (isNaN(dateObj.getTime())) {
+            return <span className="text-gray-500">Invalid date</span>;
+          }
+          
+          const formattedDate = format(dateObj, 'dd MMM yyyy');
+          return (
+            <span className="text-gray-700">
+              {formattedDate}
+            </span>
+          );
+        } catch (e) {
+          // Avoid logging the full error object to console
+          console.error('Error formatting date for assignment:', assignment.id);
+          return <span className="text-gray-500">Date unavailable</span>;
+        }
+      }
     },
     {
       key: 'status',
@@ -138,17 +169,33 @@ const ViewAssignments: React.FC = () => {
         let badgeText = '';
         
         switch (assignment.status) {
-          case 'pending':
+          case 'upcoming':
+            badgeClass = 'bg-slate-100 text-slate-800 border-slate-200';
+            badgeText = 'Upcoming';
+            break;
+          case 'due_soon':
             badgeClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            badgeText = 'Pending';
+            badgeText = 'Due Soon';
+            break;
+          case 'due_today':
+            badgeClass = 'bg-orange-100 text-orange-800 border-orange-200';
+            badgeText = 'Due Today';
+            break;
+          case 'overdue':
+            badgeClass = 'bg-red-100 text-red-800 border-red-200';
+            badgeText = 'Overdue';
             break;
           case 'submitted':
             badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
             badgeText = 'Submitted';
             break;
-          case 'graded':
+          case 'partially_graded':
+            badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+            badgeText = 'Partially Graded';
+            break;
+          case 'fully_graded':
             badgeClass = 'bg-green-100 text-green-800 border-green-200';
-            badgeText = 'Graded';
+            badgeText = 'Fully Graded';
             break;
         }
         
@@ -177,7 +224,8 @@ const ViewAssignments: React.FC = () => {
       key: 'actions',
       header: 'Actions',
       cell: (assignment: Assignment) => {
-        if (assignment.status === 'pending') {
+        // Show submit button for all assignments that aren't submitted or graded yet
+        if (['upcoming', 'due_soon', 'due_today', 'overdue'].includes(assignment.status)) {
           return (
             <div className="flex space-x-2">
               <Button variant="ghost" size="icon" className="text-primary hover:text-primary/80">
@@ -256,14 +304,14 @@ const ViewAssignments: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800">Assignments</h2>
         </div>
         
-        <Tabs defaultValue="pending" className="w-full">
+        <Tabs defaultValue="upcoming" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending">Pending ({pendingAssignments.length})</TabsTrigger>
+            <TabsTrigger value="upcoming">To Do ({pendingAssignments.length})</TabsTrigger>
             <TabsTrigger value="submitted">Submitted ({submittedAssignments.length})</TabsTrigger>
             <TabsTrigger value="graded">Graded ({gradedAssignments.length})</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="pending" className="mt-6">
+          <TabsContent value="upcoming" className="mt-6">
             <TableList
               columns={assignmentColumns}
               data={filterAssignments(pendingAssignments)}

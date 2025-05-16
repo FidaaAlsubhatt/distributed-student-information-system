@@ -31,8 +31,9 @@ import ViewStudents from "@/pages/academic/ViewStudents";
 
 // Department Admin Pages
 import DepartmentDashboard from "@/pages/department/Dashboard";
-import ManageUsers from "@/pages/department/ManageUsers";
-import ModuleManagement from "@/pages/department/ModuleManagement";
+import ManageStaff from "@/pages/department/ManageStaff";
+import ManageStudents from "@/pages/department/ManageStudents";
+import ManagePrograms from "@/pages/department/ManagePrograms";
 import DepartmentReports from "@/pages/department/Reports";
 import StudentCases from "@/pages/department/StudentCases";
 
@@ -96,14 +97,11 @@ function Router() {
       <Route path="/view-students" component={ViewStudents} />
       
       {/* Department Admin routes */}
-      <Route path="/manage-students" component={ManageUsers} />
-      <Route path="/manage-staff" component={ManageUsers} />
-      <Route path="/assign-roles" component={ManageUsers} />
-      <Route path="/manage-admins" component={ManageUsers} />
-      <Route path="/approve-enrollments" component={ModuleManagement} />
+      <Route path="/manage-students" component={ManageStudents} />
+      <Route path="/manage-staff" component={ManageStaff} />  
+      <Route path="/manage-programs" component={ManagePrograms} />
       <Route path="/student-reports" component={DepartmentReports} />
       <Route path="/dept-performance" component={DepartmentReports} />
-      <Route path="/classes-exams" component={ModuleManagement} />
       <Route path="/suspension-records" component={StudentCases} />
       <Route path="/student-performance" component={StudentCases} />
       

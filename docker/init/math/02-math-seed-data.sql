@@ -144,3 +144,46 @@ INSERT INTO student_finances (academic_year, student_id, total_due, amount_paid,
 INSERT INTO payments (finance_id, payment_date, amount, method, reference_no, received_by) VALUES
 (1, '2024-08-20', 9250.00, 'bank_transfer', 'BT20240820001', 'Finance Office'),
 (2, '2024-08-21', 4625.00, 'bank_transfer', 'BT20240821001', 'Finance Office');
+
+
+- Step 1: Add the missing columns to the assignments table
+ALTER TABLE math_schema.assignments
+  ADD COLUMN IF NOT EXISTS instructions TEXT,
+  ADD COLUMN IF NOT EXISTS total_marks INT NOT NULL DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS weight NUMERIC(5,2) NOT NULL DEFAULT 25.0,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+-- Step 2: Update existing assignments with appropriate data for math modules
+-- For module_id = 1 (likely a calculus or algebra course)
+UPDATE math_schema.assignments SET
+  instructions = 'Complete all problems in the assignment sheet. Show all steps of your work clearly. Submit your solutions as a single PDF document.',
+  total_marks = 100,
+  weight = 30.0
+WHERE module_id = 1;
+
+-- For module_id = 2 (likely a statistics or linear algebra course)
+UPDATE math_schema.assignments SET
+  instructions = 'Solve the given problems using appropriate mathematical notation. Include proofs where required. Your work should be neat and organized.',
+  total_marks = 100,
+  weight = 35.0
+WHERE module_id = 2;
+
+-- For module_id = 3 (likely a discrete mathematics or number theory course)
+UPDATE math_schema.assignments SET
+  instructions = 'Answer all questions in the problem set. For computational problems, include the steps of your calculation. For proofs, ensure they are rigorous and complete.',
+  total_marks = 100,
+  weight = 40.0
+WHERE module_id = 3;
+
+-- Step 3: Add new assignments for math modules that don't have any
+INSERT INTO math_schema.assignments (module_id, title, description, instructions, due_date, total_marks, weight, created_at)
+SELECT 2, 'Differential Equations Project', 'Solve a system of differential equations modeling a physical phenomenon.',
+  'Choose one of the physical systems described in the project document. Derive the differential equations, solve them analytically if possible, and numerically if not. Compare your results with experimental data.',
+  '2024-11-25', 100, 45.0, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM math_schema.assignments WHERE module_id = 2);
+
+INSERT INTO math_schema.assignments (module_id, title, description, instructions, due_date, total_marks, weight, created_at)
+SELECT 3, 'Statistical Analysis Assignment', 'Analyze a dataset using appropriate statistical methods.',
+  'Perform exploratory data analysis, hypothesis testing, and regression analysis on the provided dataset. Write a report interpreting your findings and discussing their implications.',
+  '2024-12-05', 100, 50.0, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM math_schema.assignments WHERE module_id = 3);
