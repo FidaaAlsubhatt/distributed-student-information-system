@@ -130,23 +130,18 @@ export default function SignIn() {
             <p className="text-xs text-gray-400 mb-2">Demo Accounts:</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <p className="font-semibold">Student:</p>
-                <p>student@university.ac.uk</p>
+                <p className="font-semibold">CS Department Admin:</p>
+                <p>cs.admin@university.ac.uk</p>
                 <p>password123</p>
               </div>
               <div>
-                <p className="font-semibold">Academic Staff:</p>
-                <p>academic@university.ac.uk</p>
-                <p>password123</p>
-              </div>
-              <div>
-                <p className="font-semibold">Department Admin:</p>
-                <p>department@university.ac.uk</p>
+                <p className="font-semibold">Math Department Admin:</p>
+                <p>math.admin@university.ac.uk</p>
                 <p>password123</p>
               </div>
               <div>
                 <p className="font-semibold">Central Admin:</p>
-                <p>admin@university.ac.uk</p>
+                <p>central.admin@university.ac.uk</p>
                 <p>password123</p>
               </div>
             </div>

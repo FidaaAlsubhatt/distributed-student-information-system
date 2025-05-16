@@ -56,20 +56,21 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
         a.title,
         a.description,
         a.instructions,
-        a.total_marks as totalMarks,
+        a.total_marks as totalmarks,
         a.weight,
-        a.created_at as createdAt,
+        a.created_at as createdat,
         m.title as module,
-        m.code as moduleCode,
-        a.due_date as dueDate,
+        m.code as modulecode,
+        a.due_date as duedate,
         CASE
           -- First handle submitted and graded statuses with higher priority
-          WHEN s.submission_id IS NOT NULL AND s.grade IS NOT NULL THEN 
+          WHEN s.submission_id IS NOT NULL AND ag.grade IS NOT NULL THEN 
             CASE 
               WHEN (
                 SELECT COUNT(*) 
-                FROM ${schema_prefix}.submissions 
-                WHERE assignment_id = a.assignment_id AND grade IS NOT NULL
+                FROM ${schema_prefix}.submissions sub
+                JOIN ${schema_prefix}.assignment_grades ag_inner ON sub.submission_id = ag_inner.submission_id
+                WHERE sub.assignment_id = a.assignment_id AND ag_inner.grade IS NOT NULL
               ) = (
                 SELECT COUNT(*) 
                 FROM ${schema_prefix}.enrollments 
@@ -85,13 +86,21 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
           WHEN a.due_date <= NOW() + INTERVAL '7 days' THEN 'due_soon'
           ELSE 'upcoming'
         END as status,
-        s.grade::text as grade,
-        s.feedback,
-        s.submitted_at as submittedAt,
-        s.file_path as filePath
+        ag.grade::text as grade,
+        ag.feedback,
+        s.submitted_at as submittedat,
+        s.file_path as filepath,
+        -- Include extra fields for debugging
+        s.submission_id::text as submission_id,
+        ag.grade_id::text as grade_id,
+        ag.staff_id::text as staff_id,
+        ag.revision_number::text as revision_number,
+        ag.graded_at as gradedat
       FROM ${schema_prefix}.assignments a
       JOIN ${schema_prefix}.modules m ON a.module_id = m.module_id
+      JOIN ${schema_prefix}.enrollments e ON m.module_id = e.module_id AND e.student_id = $1
       LEFT JOIN ${schema_prefix}.submissions s ON a.assignment_id = s.assignment_id AND s.student_id = $1
+      LEFT JOIN ${schema_prefix}.assignment_grades ag ON s.submission_id = ag.submission_id
       ORDER BY a.due_date DESC
     `, [local_user_id]);
     
