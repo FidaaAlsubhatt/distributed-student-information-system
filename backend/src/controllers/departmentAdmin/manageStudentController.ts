@@ -90,6 +90,8 @@ export const getStudents = async (req: Request, res: Response) => {
 /**
  * Add new student to the department
  */
+import { generateStudentNumber, generateUniversityEmail } from '../../utils/studentUtils';
+
 export const addStudent = async (req: Request, res: Response) => {
   let client = null;
   
@@ -97,21 +99,32 @@ export const addStudent = async (req: Request, res: Response) => {
     const { 
       firstName, 
       lastName, 
-      studentNumber, 
-      yearOfStudy, 
-      email, 
-      personalEmail, 
+      yearOfStudy,
+      personalEmail,
       gender, 
-      dateOfBirth 
+      dateOfBirth,
+      programId, // New field for assigning to program
+      // Address fields
+      line1,
+      line2,
+      city,
+      state,
+      postalCode,
+      country,
+      // Next of kin fields
+      kinName,
+      kinRelation,
+      kinPhone,
+      nationalityId
     } = req.body;
     
     // Validate required fields
-    if (!firstName || !lastName || !studentNumber || !yearOfStudy || !email) {
-      return res.status(400).json({ message: 'Missing required fields' });
+    if (!firstName || !lastName || !yearOfStudy || !personalEmail || !gender || !dateOfBirth || !programId) {
+      return res.status(400).json({ 
+        message: 'Missing required fields', 
+        required: ['firstName', 'lastName', 'yearOfStudy', 'personalEmail', 'gender', 'dateOfBirth', 'programId']
+      });
     }
-    
-    // Create university email if not provided
-    const universityEmail = email;
     
     // Get user ID from JWT token
     const userId = req.user?.userId;
@@ -133,7 +146,7 @@ export const addStudent = async (req: Request, res: Response) => {
     
     // Find department schema
     const mapResult = await centralPool.query(
-      `SELECT d.dept_id, d.schema_prefix 
+      `SELECT d.dept_id, d.schema_prefix, d.name as department_name
        FROM central.user_department ud
        JOIN central.departments d ON ud.dept_id = d.dept_id
        JOIN central.users u ON ud.user_id = u.user_id
@@ -147,6 +160,9 @@ export const addStudent = async (req: Request, res: Response) => {
     
     const { schema_prefix, dept_id } = mapResult.rows[0];
     
+    // Derive department code from schema prefix (e.g., 'cs_schema' => 'CS')
+    const dept_code = schema_prefix.split('_')[0].toUpperCase();
+    
     // Get department-specific database connection
     const deptPool = await getDepartmentPool(schema_prefix);
     client = await deptPool.connect();
@@ -155,20 +171,57 @@ export const addStudent = async (req: Request, res: Response) => {
     await client.query('BEGIN');
     
     try {
-      // 1. Create user profile entry
+      // 1. Create address record if address information is provided
+      let addressId = null;
+      
+      if (line1 && city && postalCode && country) {
+        const addressQuery = `
+          INSERT INTO ${schema_prefix}.addresses(
+            line1, line2, city, state, postal_code, country
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+        
+        const addressResult = await client.query(addressQuery, [
+          line1,
+          line2 || null,
+          city,
+          state || null,
+          postalCode,
+          country
+        ]);
+        
+        if (addressResult.rowCount && addressResult.rowCount > 0) {
+          addressId = addressResult.rows[0].id;
+        }
+      }
+      
+      // 2. Create user profile entry
       const userProfileQuery = `
         INSERT INTO ${schema_prefix}.user_profiles(
-          first_name, last_name, personal_email, gender, date_of_birth
-        ) VALUES ($1, $2, $3, $4, $5)
+          first_name, last_name, personal_email, gender, date_of_birth, address_id, nationality_id, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         RETURNING user_id
       `;
+      
+      // Extract the numeric part from the ID string and convert to integer
+      let nationalityIdInt = null;
+      if (nationalityId) {
+        // Extract numeric portion from strings like "nat1" -> 1
+        const matches = nationalityId.match(/\d+/);
+        if (matches && matches.length > 0) {
+          nationalityIdInt = parseInt(matches[0], 10);
+        }
+      }
       
       const profileResult = await client.query(userProfileQuery, [
         firstName,
         lastName,
-        personalEmail || email, // Use personalEmail if available, otherwise use email
+        personalEmail,
         gender,
-        dateOfBirth
+        dateOfBirth,
+        addressId,
+        nationalityIdInt
       ]);
       
       if (!profileResult.rowCount) {
@@ -177,45 +230,80 @@ export const addStudent = async (req: Request, res: Response) => {
       
       const userProfileId = profileResult.rows[0].user_id;
       
-      // 2. Create student record
+      // 3. Generate student number and university email
+      // Pass client directly as our utility functions support both Pool and PoolClient
+      const studentNumber = await generateStudentNumber(dept_code, client);
+      const universityEmail = await generateUniversityEmail(firstName, lastName, dept_code, client);
+      
+      // 4. Create student record
       const studentQuery = `
         INSERT INTO ${schema_prefix}.students(
-          user_id, student_number, year, university_email, status
-        ) VALUES ($1, $2, $3, $4, $5)
+          user_id, student_number, university_email, year, enroll_date, status
+        ) VALUES ($1, $2, $3, $4, CURRENT_DATE, $5)
         RETURNING user_id
       `;
       
       const studentResult = await client.query(studentQuery, [
         userProfileId,
         studentNumber,
-        yearOfStudy,
         universityEmail,
-        'active' // Default status
+        yearOfStudy,
+        'enrolled' // Default status
       ]);
       
       if (!studentResult.rowCount) {
         throw new Error('Failed to create student record');
       }
       
-      // 3. Map central users if required - would go here in a full implementation
+      // 5. Assign student to program
+      if (programId) {
+        const programAssignQuery = `
+          INSERT INTO ${schema_prefix}.student_programs(
+            student_id, program_id, start_date
+          ) VALUES ($1, $2, CURRENT_DATE)
+        `;
+        
+        // Extract the numeric part from the program ID string and convert to integer
+        let programIdInt = null;
+        if (programId) {
+          // Extract numeric portion from strings like "prog1" -> 1
+          const matches = programId.match(/\d+/);
+          if (matches && matches.length > 0) {
+            programIdInt = parseInt(matches[0], 10);
+          }
+        }
+        
+        await client.query(programAssignQuery, [userProfileId, programIdInt]);
+      }
+      
+      // 6. Add next of kin information if provided
+      if (kinName && kinRelation && kinPhone) {
+        const kinQuery = `
+          INSERT INTO ${schema_prefix}.next_of_kin(
+            student_id, name, relation, contact_number
+          ) VALUES ($1, $2, $3, $4)
+        `;
+        
+        await client.query(kinQuery, [userProfileId, kinName, kinRelation, kinPhone]);
+      }
       
       // Commit transaction
       await client.query('COMMIT');
       
       // Return success with student info
       return res.status(201).json({
-        message: 'Student added successfully',
+        message: 'Student registered successfully',
         student: {
           id: userProfileId,
           firstName,
           lastName,
           studentNumber,
           yearOfStudy,
-          email: universityEmail,
-          personalEmail: personalEmail || email,
+          universityEmail,
+          personalEmail,
           gender,
           dateOfBirth,
-          status: 'active'
+          status: 'enrolled'
         }
       });
     } catch (error) {

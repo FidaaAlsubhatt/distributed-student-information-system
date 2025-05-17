@@ -5,7 +5,6 @@ import * as userController from '../../controllers/departmentAdmin/userControlle
 import * as programController from '../../controllers/departmentAdmin/programController';
 import * as staffController from '../../controllers/departmentAdmin/manageStaffController';
 import * as studentController from '../../controllers/departmentAdmin/manageStudentController';
-
 const router = Router();
 
 // Apply authentication middleware to all routes
@@ -16,7 +15,9 @@ router.use(authenticate);
 // GET    /api/department/users/staff - Get all staff in the department
 router.get('/users/:userType', userController.getUsers);
 
-// POST   /api/department/users/student - Add a new student to the department
+// POST   /api/department/students - Add a new student to the department (uses specialized controller)
+router.post('/students', studentController.addStudent);
+
 // POST   /api/department/users/staff - Add a new staff member to the department 
 router.post('/users/:userType', userController.createUser);
 

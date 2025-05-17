@@ -37,13 +37,31 @@ export interface UserData {
 }
 
 export interface StudentFormData {
+  // Personal details
   firstName: string;
   lastName: string;
-  email: string;
-  password?: string;
-  role: 'student';
-  studentNumber: string;
+  personalEmail: string;
+  gender: string;
+  dateOfBirth: string;
   yearOfStudy: number;
+  programId: string;
+  nationalityId?: string;
+  role: 'student';
+  
+  // Address
+  line1: string;
+  line2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+  
+  // Next of kin / emergency contact
+  kinName: string;
+  kinRelation: string;
+  kinPhone: string;
+  
+  // Department info - used internally
   departmentId?: string;
 }
 
