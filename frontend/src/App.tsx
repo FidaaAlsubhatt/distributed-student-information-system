@@ -36,13 +36,15 @@ import ManageStudents from "@/pages/department/ManageStudents";
 import ManagePrograms from "@/pages/department/ManagePrograms";
 import DepartmentReports from "@/pages/department/Reports";
 import StudentCases from "@/pages/department/StudentCases";
+import DepartmentExams from "@/pages/department/Exams";
+import DepartmentClasses from "@/pages/department/Classes";
 
 // Central Admin Pages
 import CentralDashboard from "@/pages/central/Dashboard";
 import DepartmentManagement from "@/pages/central/DepartmentManagement";
 import InstitutionReports from "@/pages/central/InstitutionReports";
 import SecurityMonitoring from "@/pages/central/SecurityMonitoring";
-import UserManagement from "@/pages/central/UserManagement";
+
 
 function Router() {
   return (
@@ -104,6 +106,8 @@ function Router() {
       <Route path="/dept-performance" component={DepartmentReports} />
       <Route path="/suspension-records" component={StudentCases} />
       <Route path="/student-performance" component={StudentCases} />
+      <Route path="/exams" component={DepartmentExams} />
+      <Route path="/classes" component={DepartmentClasses} />
       
       {/* Central Admin routes */}
       <Route path="/manage-dept-admins" component={DepartmentManagement} />
@@ -115,11 +119,6 @@ function Router() {
       <Route path="/login-attempts" component={SecurityMonitoring} />
       <Route path="/audit-trail" component={SecurityMonitoring} />
       <Route path="/role-permissions" component={SecurityMonitoring} />
-      <Route path="/manage-users">
-        <ProtectedRoute requiredRole="central_admin">
-          <UserManagement />
-        </ProtectedRoute>
-      </Route>
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

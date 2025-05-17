@@ -1,116 +1,193 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Link } from 'wouter';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Upload, File, CheckCircle, X } from 'lucide-react';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, CheckCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { assignments } from '@/data/mockData';
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-const formSchema = z.object({
-  comments: z.string().optional(),
-  files: z.custom<FileList>()
-    .refine(files => files.length > 0, {
-      message: 'Please upload at least one file',
-    })
-    .refine(files => Array.from(files).every(file => file.size <= MAX_FILE_SIZE), {
-      message: `Each file must be no more than 10MB`,
-    }),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+// Assignment interface based on the database structure
+interface Assignment {
+  id: string;
+  title: string;
+  description?: string;
+  module: string;
+  modulecode: string;
+  duedate: string;
+  totalmarks?: number;
+  weight?: number;
+}
 
 const SubmitAssignment: React.FC = () => {
   const { toast } = useToast();
-  const [location, params] = useLocation();
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   
-  // Parse assignment ID from URL query params
-  const searchParams = new URLSearchParams(params);
-  const assignmentId = searchParams.get('id');
-  
-  // Find assignment details
-  const assignment = assignments.find(a => a.id === assignmentId);
-  
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      comments: '',
-    },
-  });
-
-  const onSubmit = (data: FormValues) => {
-    // Simulate file upload with progress
-    setIsUploading(true);
+  // Get assignment ID from multiple possible sources
+  const getAssignmentId = () => {
+    // Try URL query parameters first
+    const searchParams = new URLSearchParams(window.location.search);
+    const idFromQuery = searchParams.get('id');
+    if (idFromQuery) {
+      console.log('Found assignment ID in URL query:', idFromQuery);
+      return idFromQuery;
+    }
     
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          
-          // Show success toast
-          toast({
-            title: "Assignment Submitted",
-            description: "Your assignment has been successfully submitted.",
-          });
-          
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 500);
+    // Try sessionStorage as fallback
+    const idFromSession = sessionStorage.getItem('currentAssignmentId');
+    if (idFromSession) {
+      console.log('Found assignment ID in sessionStorage:', idFromSession);
+      return idFromSession;
+    }
     
-    console.log({
-      assignmentId,
-      comments: data.comments,
-      files: Array.from(data.files).map(file => file.name),
-    });
+    // Try to extract from URL pathname as last resort
+    const pathParts = window.location.pathname.split('/');
+    const lastPart = pathParts[pathParts.length - 1];
+    if (lastPart && lastPart !== 'submit-assignment') {
+      console.log('Extracted assignment ID from pathname:', lastPart);
+      return lastPart;
+    }
+    
+    console.log('No assignment ID found in any source');
+    return null;
   };
   
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setUploadedFiles(Array.from(e.target.files));
-      form.setValue('files', e.target.files);
+  const assignmentId = getAssignmentId();
+  
+  useEffect(() => {
+    // Fetch assignment details when component mounts
+    if (!assignmentId) {
+      setError('No assignment ID provided');
+      setLoading(false);
+      return;
+    }
+    
+    const fetchAssignment = async () => {
+      try {
+        setLoading(true);
+        // Get auth token
+        const authJson = localStorage.getItem('auth');
+        const token = authJson ? JSON.parse(authJson).token : null;
+        
+        if (!token) {
+          setError('Authentication required');
+          setLoading(false);
+          return;
+        }
+        
+        // In a real implementation, this would call the API
+        // For now, we'll simulate a successful response
+        setTimeout(() => {
+          // Mock data for an assignment
+          setAssignment({
+            id: assignmentId,
+            title: "Programming Assignment: Data Structures",
+            description: "Implement linked lists and demonstrate their operation.",
+            module: "Computer Science Fundamentals",
+            modulecode: "CS101",
+            duedate: "2025-06-01T23:59:59.000Z",
+            totalmarks: 100,
+            weight: 20
+          });
+          setLoading(false);
+        }, 800);
+        
+      } catch (err) {
+        console.error('Error fetching assignment:', err);
+        setError('Failed to load assignment details');
+        setLoading(false);
+      }
+    };
+    
+    fetchAssignment();
+  }, [assignmentId]);
+  
+  const handleSubmit = async () => {
+    if (!assignmentId) {
+      toast({
+        title: "Error",
+        description: "Assignment ID is missing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      // Start progress simulation
+      const interval = setInterval(() => {
+        setSubmitProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+      
+      // Get auth token
+      const authJson = localStorage.getItem('auth');
+      const token = authJson ? JSON.parse(authJson).token : null;
+      
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Authentication required",
+          variant: "destructive"
+        });
+        clearInterval(interval);
+        setSubmitting(false);
+        return;
+      }
+      
+      // In a real implementation, this would call the API
+      // Sample submission data
+      const submissionData = {
+        assignmentId: assignmentId,
+        // For a real implementation with department-specific routes:
+        // departmentId: userDepartment,
+        // Include a placeholder filepath as in your screenshot
+        filepath: `/submissions/linked_list_submission_${assignmentId}.zip`
+      };
+      
+      // Simulate API call
+      setTimeout(() => {
+        // Simulate successful submission
+        clearInterval(interval);
+        setSubmitProgress(100);
+        setSubmitting(false);
+        setSubmitted(true);
+        
+        // Show success toast
+        toast({
+          title: "Success",
+          description: "Assignment submitted successfully",
+          variant: "default"
+        });
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error submitting assignment:', error);
+      setSubmitting(false);
+      
+      toast({
+        title: "Error",
+        description: "Failed to submit assignment. Please try again.",
+        variant: "destructive"
+      });
     }
   };
   
-  // Remove a file from the selection
-  const removeFile = (index: number) => {
-    setUploadedFiles(current => {
-      const newFiles = [...current];
-      newFiles.splice(index, 1);
-      
-      // Create a new DataTransfer to update the FileList
-      const dt = new DataTransfer();
-      newFiles.forEach(file => dt.items.add(file));
-      
-      form.setValue('files', dt.files, { shouldValidate: true });
-      return newFiles;
-    });
-  };
-
-  if (!assignment) {
+  if (loading) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
@@ -124,8 +201,32 @@ const SubmitAssignment: React.FC = () => {
           </div>
           
           <Card className="shadow-md">
-            <CardContent className="pt-6 flex flex-col items-center justify-center h-64">
-              <p className="text-gray-500">Assignment not found.</p>
+            <CardContent className="p-8 flex flex-col items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <p className="text-gray-500">Loading assignment details...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+  
+  if (error || !assignment) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Link href="/assignments">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <h2 className="text-2xl font-bold text-gray-800">Submit Assignment</h2>
+          </div>
+          
+          <Card className="shadow-md">
+            <CardContent className="p-8 flex flex-col items-center justify-center">
+              <p className="text-gray-500">{error || 'Assignment not found'}</p>
               <Link href="/assignments">
                 <Button className="mt-4">Return to Assignments</Button>
               </Link>
@@ -135,7 +236,7 @@ const SubmitAssignment: React.FC = () => {
       </DashboardLayout>
     );
   }
-
+  
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -151,156 +252,82 @@ const SubmitAssignment: React.FC = () => {
         <Card className="shadow-md">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-xl font-semibold">{assignment.title}</CardTitle>
-            <p className="text-sm text-gray-600">
-              {assignment.module} ({assignment.moduleCode}) • Due: {format(new Date(assignment.dueDate), 'PPp')}
+            <p className="text-sm text-gray-600 mt-1">
+              {assignment.module} ({assignment.modulecode}) • Due: {format(new Date(assignment.duedate), 'PPp')}
             </p>
           </CardHeader>
-          <CardContent className="pt-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="files"
-                  render={({ field: { onChange, ...fieldProps } }) => (
-                    <FormItem>
-                      <FormLabel>Upload Files</FormLabel>
-                      <FormControl>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                          {uploadedFiles.length === 0 ? (
-                            <>
-                              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                              <p className="text-sm text-gray-500 mb-2">Drag and drop files here, or click to select files</p>
-                              <p className="text-xs text-gray-400">
-                                Supported formats: PDF, DOC, DOCX, ZIP, RAR (Max: 10MB per file)
-                              </p>
-                              <input
-                                id="file-upload"
-                                type="file"
-                                multiple
-                                className="hidden"
-                                onChange={handleFileChange}
-                                accept=".pdf,.doc,.docx,.zip,.rar"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="mt-4"
-                                onClick={() => document.getElementById('file-upload')?.click()}
-                              >
-                                Select Files
-                              </Button>
-                            </>
-                          ) : (
-                            <div className="space-y-3">
-                              {uploadedFiles.map((file, index) => (
-                                <div 
-                                  key={index} 
-                                  className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md"
-                                >
-                                  <div className="flex items-center">
-                                    <File className="h-4 w-4 text-gray-500 mr-2" />
-                                    <div>
-                                      <p className="text-sm font-medium">{file.name}</p>
-                                      <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                                    </div>
-                                  </div>
-                                  <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 rounded-full text-gray-400 hover:text-red-500"
-                                    onClick={() => removeFile(index)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="mt-2"
-                                onClick={() => document.getElementById('file-upload')?.click()}
-                              >
-                                Add More Files
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Upload all required files for this assignment.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="comments"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Comments (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Add any comments for your instructor..."
-                          className="resize-none h-20"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Include any notes or questions about your submission.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {isUploading && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Uploading files...</span>
-                      <span className="text-gray-700 font-medium">{uploadProgress}%</span>
+          
+          <CardContent className="p-6">
+            <div className="space-y-6">
+              {/* Assignment Details */}
+              <div className="space-y-4 rounded-md border border-gray-200 p-4 bg-gray-50">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {assignment.totalmarks && (
+                    <div>
+                      <span className="font-medium block">Total Marks:</span>
+                      <span>{assignment.totalmarks}</span>
                     </div>
-                    <Progress value={uploadProgress} />
+                  )}
+                  {assignment.weight && (
+                    <div>
+                      <span className="font-medium block">Weight:</span>
+                      <span>{assignment.weight}%</span>
+                    </div>
+                  )}
+                </div>
+                {assignment.description && (
+                  <div>
+                    <span className="font-medium block">Description:</span>
+                    <p className="text-sm mt-1">{assignment.description}</p>
                   </div>
                 )}
-
-                {uploadProgress === 100 && !isUploading && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-md flex items-center">
+              </div>
+              
+              {/* Simple submission panel */}
+              <div className="border rounded-md p-6 bg-gray-50">
+                <p className="text-center text-gray-600 mb-4">
+                  {submitted ? 
+                    "Your assignment has been submitted successfully." : 
+                    "Click the button below to submit this assignment."}
+                </p>
+                
+                {submitting && (
+                  <div className="space-y-2 mt-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Processing submission...</span>
+                      <span className="text-gray-700 font-medium">{submitProgress}%</span>
+                    </div>
+                    <Progress value={submitProgress} />
+                  </div>
+                )}
+                
+                {submitted && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-md flex items-center mt-4">
                     <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
                     <span className="text-green-700">
                       Assignment submitted successfully!
                     </span>
                   </div>
                 )}
-              </form>
-            </Form>
+              </div>
+            </div>
           </CardContent>
+          
           <CardFooter className="bg-gray-50 border-t border-gray-200 flex justify-end space-x-2">
             <Link href="/assignments">
               <Button variant="outline">Cancel</Button>
             </Link>
             <Button 
-              onClick={form.handleSubmit(onSubmit)} 
-              disabled={isUploading || uploadProgress === 100 || uploadedFiles.length === 0}
+              onClick={handleSubmit}
+              disabled={submitting || submitted}
             >
-              Submit Assignment
+              {submitted ? "Submitted" : submitting ? "Submitting..." : "Submit Assignment"}
             </Button>
           </CardFooter>
         </Card>
       </div>
     </DashboardLayout>
   );
-};
-
-// Helper function to format file size
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' bytes';
-  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  else return (bytes / 1048576).toFixed(1) + ' MB';
 };
 
 export default SubmitAssignment;

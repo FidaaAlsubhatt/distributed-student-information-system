@@ -255,7 +255,14 @@ const ViewAssignments: React.FC = () => {
               <Button variant="ghost" size="icon" className="text-primary hover:text-primary/80">
                 <Eye className="h-4 w-4" />
               </Button>
-              <Link href={`/submit-assignment?id=${assignment.id}`}>
+              <Link href="/submit-assignment" onClick={() => {
+                // Store assignment ID in sessionStorage as a fallback method
+                sessionStorage.setItem('currentAssignmentId', assignment.id);
+                console.log('Set assignment ID in sessionStorage:', assignment.id);
+                window.location.href = `/submit-assignment?id=${assignment.id}`;
+                // Prevent default link behavior since we're using window.location
+                return false;
+              }}>
                 <Button variant="ghost" size="icon" className="text-green-600 hover:text-green-700" title="Submit Assignment">
                   <Upload className="h-4 w-4" />
                 </Button>

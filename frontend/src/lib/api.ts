@@ -3,6 +3,9 @@ import axios from 'axios';
 // Define user role type
 export type UserRole = 'student' | 'academic_staff' | 'department_admin' | 'central_admin';
 
+// Define admin type
+export type AdminRole = 'central_admin' | 'department_admin';
+
 // Define department role type
 export interface DepartmentRole {
   id: number;
@@ -56,12 +59,22 @@ export interface AcademicStaffFormData {
   departmentId?: string;
 }
 
+// Define form data for admin users
+export interface AdminFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role: AdminRole;
+  departmentId?: string;
+}
+
 export type CreateUserFormData = Partial<StudentFormData> & Partial<AcademicStaffFormData> & {
   firstName: string;
   lastName: string;
   email: string;
   password?: string;
-  role: 'student' | 'academic_staff';
+  role: string;
   departmentId?: string;
 };
 
@@ -187,20 +200,32 @@ export const api = {
 
   // Academic staff
   addAcademicStaff: async (staffData: AcademicStaffFormData, departmentCode: string): Promise<any> => {
-    return apiRequest('POST', '/api/department/users/staff', staffData, departmentCode);
+    return apiRequest('POST', '/api/department/staff', staffData, departmentCode);
   },
 
   getDepartmentStaff: async (departmentCode: string) => {
-    return apiRequest<any[]>('GET', '/api/department/users/staff', undefined, departmentCode);
+    return apiRequest<any[]>('GET', '/api/department/staff', undefined, departmentCode);
   },
   
   updateStaff: async (id: string, staffData: any, departmentCode: string): Promise<any> => {
-    // Fixed URL pattern to match what the backend expects
-    return apiRequest('PUT', `/api/department/users/${'staff'}/${id}`, staffData, departmentCode);
+    return apiRequest('PUT', `/api/department/staff/${id}`, staffData, departmentCode);
   },
 
   deleteStaff: async (staffId: string, departmentCode: string): Promise<any> => {
-    return apiRequest('DELETE', `/api/department/users/staff/${staffId}`, undefined, departmentCode);
+    return apiRequest('DELETE', `/api/department/staff/${staffId}`, undefined, departmentCode);
+  },
+  
+  // Module staff assignments
+  getModuleStaff: async (moduleId: string, departmentCode: string) => {
+    return apiRequest<any[]>('GET', `/api/department/modules/${moduleId}/staff`, undefined, departmentCode);
+  },
+  
+  assignStaffToModule: async (assignmentData: {staffId: string, moduleId: string, role?: string}, departmentCode: string): Promise<any> => {
+    return apiRequest('POST', '/api/department/modules/staff', assignmentData, departmentCode);
+  },
+  
+  removeStaffFromModule: async (moduleId: string, staffId: string, departmentCode: string): Promise<any> => {
+    return apiRequest('DELETE', `/api/department/modules/${moduleId}/staff/${staffId}`, undefined, departmentCode);
   },
 
   // Department users - generic endpoint for all users
@@ -210,5 +235,27 @@ export const api = {
 
   deleteUserInDepartment: async (userId: string, departmentCode: string): Promise<any> => {
     return apiRequest('DELETE', `/api/users/${userId}`, undefined, departmentCode);
+  },
+
+  // Admin management
+  createAdmin: async (adminData: AdminFormData): Promise<any> => {
+    return apiRequest('POST', '/api/admin', adminData);
+  },
+
+  getAdmins: async (type?: string): Promise<any[]> => {
+    const queryParams = type ? `?type=${type}` : '';
+    return apiRequest('GET', `/api/admin${queryParams}`);
+  },
+
+  getAdminById: async (adminId: string): Promise<any> => {
+    return apiRequest('GET', `/api/admin/${adminId}`);
+  },
+
+  updateAdmin: async (adminId: string, adminData: Partial<AdminFormData>): Promise<any> => {
+    return apiRequest('PUT', `/api/admin/${adminId}`, adminData);
+  },
+
+  deleteAdmin: async (adminId: string): Promise<any> => {
+    return apiRequest('DELETE', `/api/admin/${adminId}`);
   },
 };

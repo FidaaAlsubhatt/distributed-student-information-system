@@ -26,25 +26,6 @@ import {
 } from 'recharts';
 import { Building, Lock, Shield, Users, Award, History, Settings } from 'lucide-react';
 
-// Mock data for charts
-const enrollmentTrends = [
-  { year: '2019', students: 12400 },
-  { year: '2020', students: 13200 },
-  { year: '2021', students: 14500 },
-  { year: '2022', students: 15800 },
-  { year: '2023', students: 17200 },
-  { year: '2024', students: 18500 },
-];
-
-const departmentComparison = [
-  { name: 'Computer Science', students: 3250, staff: 125 },
-  { name: 'Business', students: 3850, staff: 155 },
-  { name: 'Engineering', students: 3550, staff: 145 },
-  { name: 'Medicine', students: 2950, staff: 180 },
-  { name: 'Arts & Humanities', students: 2650, staff: 135 },
-  { name: 'Sciences', students: 2250, staff: 120 },
-];
-
 const genderDistribution = [
   { name: 'Male', value: 52 },
   { name: 'Female', value: 47 },
@@ -199,59 +180,7 @@ const CentralDashboard: React.FC = () => {
           ))}
         </div>
         
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DashboardCard
-            title="Enrollment Trends"
-            headerClassName="border-b"
-          >
-            <div className="pt-4 h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={enrollmentTrends}
-                  margin={{
-                    top: 10,
-                    right: 10,
-                    left: 0,
-                    bottom: 0,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="students" stroke="#8884d8" fillOpacity={0.3} fill="#8884d8" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </DashboardCard>
-          
-          <DashboardCard
-            title="Department Comparison"
-            headerClassName="border-b"
-          >
-            <div className="pt-4 h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={departmentComparison}
-                  margin={{
-                    top: 10,
-                    right: 10,
-                    left: 0,
-                    bottom: 0,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="students" name="Students" fill="#8884d8" />
-                  <Bar dataKey="staff" name="Staff" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </DashboardCard>
-        </div>
+
         
         {/* Quick Actions */}
         <DashboardCard title="Quick Actions">
@@ -309,129 +238,6 @@ const CentralDashboard: React.FC = () => {
             </div>
           </DashboardCard>
         </div>
-        
-        {/* Notifications & Demographics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DashboardCard 
-            title="Recent Notifications" 
-            footerLink={{ url: '/notifications', text: 'View All Notifications' }}
-          >
-            <div className="space-y-4 mt-2">
-              {notifications.slice(0, 3).map((notification) => (
-                <NotificationItem 
-                  key={notification.id} 
-                  notification={notification} 
-                />
-              ))}
-            </div>
-          </DashboardCard>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Demographics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[250px] flex items-center">
-                <ResponsiveContainer width="50%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={genderDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={renderCustomizedLabel}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {genderDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2">
-                  <h3 className="font-medium text-gray-800">Gender Distribution</h3>
-                  {genderDistribution.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: colors[index % colors.length] }}
-                      ></div>
-                      <span className="text-sm text-gray-700">{item.name}: {item.value}%</span>
-                    </div>
-                  ))}
-                  <div className="pt-4">
-                    <Button variant="outline" size="sm">View Full Demographics</Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Additional Metrics */}
-        <Card>
-          <CardHeader className="pb-0">
-            <CardTitle>Key Performance Indicators</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-blue-100 text-blue-600">
-                    <Award className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">Graduation Rate</span>
-                </div>
-                <div className="pl-10">
-                  <div className="text-2xl font-bold">92%</div>
-                  <div className="text-sm text-green-600">↑ 2.5% from previous year</div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-green-100 text-green-600">
-                    <Users className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">Student-Faculty Ratio</span>
-                </div>
-                <div className="pl-10">
-                  <div className="text-2xl font-bold">14:1</div>
-                  <div className="text-sm text-gray-500">No change from last year</div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-purple-100 text-purple-600">
-                    <History className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">Retention Rate</span>
-                </div>
-                <div className="pl-10">
-                  <div className="text-2xl font-bold">88%</div>
-                  <div className="text-sm text-green-600">↑ 1.2% from previous year</div>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-amber-100 text-amber-600">
-                    <Building className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-gray-500">New Enrollments</span>
-                </div>
-                <div className="pl-10">
-                  <div className="text-2xl font-bold">4,250</div>
-                  <div className="text-sm text-green-600">↑ 350 from previous year</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

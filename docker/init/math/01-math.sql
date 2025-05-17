@@ -103,7 +103,7 @@ CREATE TABLE module_prerequisites (
   UNIQUE(module_id, prereq_id)
 );
 
--CREATE TABLE enrollments (
+CREATE TABLE enrollments (
   enrollment_id SERIAL PRIMARY KEY,
   student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
   module_id INT REFERENCES modules(module_id) ON DELETE CASCADE,

@@ -63,6 +63,15 @@ CREATE TABLE programs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE student_programs (
+  id SERIAL PRIMARY KEY,
+  student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
+  program_id INT REFERENCES programs(program_id) ON DELETE CASCADE,
+  start_date DATE DEFAULT CURRENT_DATE,
+  UNIQUE(student_id, program_id)
+);
+
+
 CREATE TABLE semesters (
   semester_id SERIAL PRIMARY KEY,
   name VARCHAR(20) NOT NULL,

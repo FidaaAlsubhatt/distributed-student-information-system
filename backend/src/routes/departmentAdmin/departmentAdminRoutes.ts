@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware';
 import * as userController from '../../controllers/departmentAdmin/userController';
 import * as programController from '../../controllers/departmentAdmin/programController';
+import * as staffController from '../../controllers/departmentAdmin/manageStaffController';
+import * as studentController from '../../controllers/departmentAdmin/manageStudentController';
 
 const router = Router();
 
@@ -38,5 +40,49 @@ router.put('/programs/:id', programController.updateProgram);
 
 // DELETE /api/department/programs/:id - Delete a program from the department
 router.delete('/programs/:id', programController.deleteProgram);
+
+// Staff management routes
+// GET /api/department/staff - Get all staff members
+router.get('/staff', staffController.getStaff);
+
+// POST /api/department/staff - Add a new staff member
+router.post('/staff', staffController.addStaff);
+
+// PUT /api/department/staff/:id - Update a staff member
+router.put('/staff/:id', staffController.updateStaff);
+
+// DELETE /api/department/staff/:id - Delete a staff member
+router.delete('/staff/:id', staffController.deleteStaff);
+
+// GET /api/department/modules/:moduleId/staff - Get staff assigned to a module
+router.get('/modules/:moduleId/staff', staffController.getModuleStaff);
+
+// POST /api/department/modules/staff - Assign staff to a module
+router.post('/modules/staff', staffController.assignStaffToModule);
+
+// DELETE /api/department/modules/:moduleId/staff/:staffId - Remove staff from a module
+router.delete('/modules/:moduleId/staff/:staffId', staffController.removeStaffFromModule);
+
+// Student management routes
+// GET /api/department/students - Get all students
+router.get('/students', studentController.getStudents);
+
+// POST /api/department/students - Add a new student
+router.post('/students', studentController.addStudent);
+
+// PUT /api/department/students/:id - Update a student
+router.put('/students/:id', studentController.updateStudent);
+
+// DELETE /api/department/students/:id - Delete a student
+router.delete('/students/:id', studentController.deleteStudent);
+
+// POST /api/department/programs/students - Assign student to a program
+router.post('/programs/students', studentController.assignStudentToProgram);
+
+// GET /api/department/programs/:programId/students - Get students in a program
+router.get('/programs/:programId/students', studentController.getProgramStudents);
+
+// DELETE /api/department/programs/:programId/students/:studentId - Remove student from a program
+router.delete('/programs/:programId/students/:studentId', studentController.removeStudentFromProgram);
 
 export default router;

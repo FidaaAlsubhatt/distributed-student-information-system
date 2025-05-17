@@ -49,11 +49,18 @@ import {
 import { useToast } from '../../hooks/use-toast';
 import TableList from '../../components/dashboard/TableList';
 import AdminUserForm from '../../components/admin/AdminUserForm';
-import { useUsers, useDepartments, User, Department } from '../../hooks/use-users';
+import AdminEditForm from '../../components/admin/AdminEditForm';
+import DeleteAdminDialog from '../../components/admin/DeleteAdminDialog';
+import { useUsers, useDepartments, User as BaseUser, Department } from '../../hooks/use-users';
+import { DepartmentRole } from '../../lib/api';
+
+// Extended user interface to include departmentRoles
+interface User extends BaseUser {
+  departmentRoles?: DepartmentRole[];
+}
 import { 
   Building, 
   UserPlus, 
-  Check, 
   Settings, 
   Users, 
   Pencil, 
@@ -93,7 +100,6 @@ const formatDepartment = (dept: Department) => {
     email: dept.contact_email || `${dept.name.toLowerCase().replace(/\s+/g, '.')}@university.edu`,
     students: Math.floor(Math.random() * 1000) + 500, // Placeholder for now
     staff: Math.floor(Math.random() * 100) + 20, // Placeholder for now
-    avgGpa: avgGpa, // Placeholder for now
     campus: dept.host?.includes('cs') ? 'Computer Science Campus' : 'Mathematics Campus',
     established: 1950 + Math.floor(Math.random() * 50), // Placeholder for now
     status: dept.status || 'active',
@@ -104,10 +110,14 @@ const formatDepartment = (dept: Department) => {
 const DepartmentManagement: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('departments');
-  const [selectedDepartment, setSelectedDepartment] = useState<typeof extendedDepartments[0] | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isAdminFormOpen, setIsAdminFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // States for admin management
+  const [selectedAdmin, setSelectedAdmin] = useState<typeof formattedAdminUsers[0] | null>(null);
+  const [isEditAdminOpen, setIsEditAdminOpen] = useState(false);
+  const [isDeleteAdminOpen, setIsDeleteAdminOpen] = useState(false);
 
   // Fetch users and departments from the API
   const { data: users = [], isLoading: isLoadingUsers, isError: isErrorUsers } = useUsers();
@@ -125,20 +135,47 @@ const DepartmentManagement: React.FC = () => {
     user.role === 'central_admin' || user.role === 'department_admin'
   );
 
-  // Format admin users for the UI
-  const formattedAdminUsers = adminUsers.map(user => {
-    const fullName = user.fullName || `${user.firstName} ${user.lastName}`;
-    return {
-      id: user.id,
-      name: fullName,
-      email: user.email,
-      department: user.roleScope === 'department' ? 
-        typedDepartments.find(dept => dept.dept_id === user.departmentId)?.name || 'Not Assigned' : 
-        'All Departments',
-      role: user.role === 'central_admin' ? 'Central Admin' : 'Department Admin',
-      initials: getInitials(fullName)
-    };
-  });
+  // Format admin users data for the table
+  const formattedAdminUsers = adminUsers
+    .filter(user => user.role === 'central_admin' || user.role === 'department_admin')
+    .map(admin => {
+      // For department admins, find their department
+      let department = '';
+      let departmentId = '';
+      
+      if (admin.role === 'department_admin') {
+        // First try to get from departmentRoles array which comes from the API
+        if (admin.departmentRoles && admin.departmentRoles.length > 0) {
+          department = admin.departmentRoles[0].departmentName || '';
+          departmentId = admin.departmentRoles[0].departmentId || '';
+        } 
+        // Fallback to direct departmentId property
+        else if (admin.departmentId) {
+          const userDepartment = typedDepartments.find(dept => dept.dept_id === admin.departmentId);
+          if (userDepartment) {
+            department = userDepartment.name;
+            departmentId = admin.departmentId;
+          }
+        }
+      } else {
+        // For central admins
+        department = '/';
+      }
+      
+      return {
+        id: admin.id,
+        userId: admin.id, // Used for API calls
+        name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim(),
+        firstName: admin.firstName || '',
+        lastName: admin.lastName || '',
+        email: admin.email || '',
+        department: department,
+        departmentId: departmentId,
+        role: admin.role || '',
+        status: admin.status || 'active',
+        initials: getInitials(`${admin.firstName || ''} ${admin.lastName || ''}`),
+      };
+    });
 
   // Filter departments based on search
   const filteredDepartments = extendedDepartments.filter(department => 
@@ -222,10 +259,6 @@ const DepartmentManagement: React.FC = () => {
         <div>
           <p className="text-gray-500">Campus</p>
           <p className="font-medium">{department.campus}</p>
-        </div>
-        <div>
-          <p className="text-gray-500">Average GPA</p>
-          <p className="font-medium">{department.avgGpa}/4.0</p>
         </div>
       </div>
       
@@ -376,10 +409,31 @@ const DepartmentManagement: React.FC = () => {
       header: '',
       cell: (admin: typeof formattedAdminUsers[0]) => (
         <div className="flex justify-end">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Check className="h-4 w-4" />
+          {/* Edit Admin Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => {
+              setSelectedAdmin(admin);
+              setIsEditAdminOpen(true);
+            }}
+            title="Edit Administrator"
+          >
+            <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          
+          {/* Delete Admin Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => {
+              setSelectedAdmin(admin);
+              setIsDeleteAdminOpen(true);
+            }}
+            title="Delete Administrator"
+          >
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -468,30 +522,6 @@ const DepartmentManagement: React.FC = () => {
                   
                   <FormField
                     control={form.control}
-                    name="campus"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Campus</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select campus" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Main Campus">Main Campus</SelectItem>
-                            <SelectItem value="North Campus">North Campus</SelectItem>
-                            <SelectItem value="South Campus">South Campus</SelectItem>
-                            <SelectItem value="Medical Campus">Medical Campus</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
                     name="description"
                     render={({ field }) => (
                       <FormItem>
@@ -518,7 +548,7 @@ const DepartmentManagement: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <TabsList>
               <TabsTrigger value="departments">Departments</TabsTrigger>
-              <TabsTrigger value="admins">Department Admins</TabsTrigger>
+              <TabsTrigger value="admins">Admins</TabsTrigger>
             </TabsList>
             
             <div className="relative w-64">
@@ -553,44 +583,6 @@ const DepartmentManagement: React.FC = () => {
                       <p className="text-sm text-gray-500">Academic departments</p>
                     </CardContent>
                   </Card>
-                  
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Total Students</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {extendedDepartments.reduce((sum, dept) => sum + dept.students, 0)}
-                      </div>
-                      <p className="text-sm text-gray-500">Across all departments</p>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Total Staff</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {extendedDepartments.reduce((sum, dept) => sum + dept.staff, 0)}
-                      </div>
-                      <p className="text-sm text-gray-500">Faculty and administration</p>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Average GPA</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {extendedDepartments.length > 0 ? 
-                          (extendedDepartments.reduce((sum, dept) => sum + Number(dept.avgGpa), 0) / extendedDepartments.length).toFixed(1) : 
-                          'N/A'}
-                      </div>
-                      <p className="text-sm text-gray-500">University-wide</p>
-                    </CardContent>
-                  </Card>
                 </div>
                 
                 {/* Departments Table */}
@@ -623,7 +615,7 @@ const DepartmentManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Department Admins</CardTitle>
+                      <CardTitle className="text-base">Admins</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{formattedAdminUsers.length}</div>
@@ -669,6 +661,30 @@ const DepartmentManagement: React.FC = () => {
                   <AdminUserForm 
                     isOpen={isAdminFormOpen} 
                     onClose={() => setIsAdminFormOpen(false)} 
+                  />
+                )}
+                
+                {/* Admin Edit Form Dialog */}
+                {isEditAdminOpen && selectedAdmin && (
+                  <AdminEditForm
+                    admin={selectedAdmin}
+                    isOpen={isEditAdminOpen}
+                    onClose={() => {
+                      setIsEditAdminOpen(false);
+                      setSelectedAdmin(null);
+                    }}
+                  />
+                )}
+                
+                {/* Admin Delete Confirmation Dialog */}
+                {isDeleteAdminOpen && selectedAdmin && (
+                  <DeleteAdminDialog
+                    admin={selectedAdmin}
+                    isOpen={isDeleteAdminOpen}
+                    onClose={() => {
+                      setIsDeleteAdminOpen(false);
+                      setSelectedAdmin(null);
+                    }}
                   />
                 )}
                 

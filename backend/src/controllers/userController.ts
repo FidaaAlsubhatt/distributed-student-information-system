@@ -375,63 +375,7 @@ export const addStudent = async (req: Request, res: Response) => {
       role: 'student'
     });
     
-    /* Commented out actual database implementation for now
-    // Start a transaction
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      // Create address if provided
-      let addressId = null;
-      if (address) {
-        const addressResult = await client.query(
-          `INSERT INTO ${schemaPrefix}.addresses 
-           (line1, line2, city, state, postal_code, country, created_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id`,
-          [address.street, null, address.city, null, address.postalCode, address.country]
-        );
-        addressId = addressResult.rows[0].id;
-      }
-      
-      // Insert user profile
-      const userProfileResult = await client.query(
-        `INSERT INTO ${schemaPrefix}.user_profiles 
-         (first_name, last_name, date_of_birth, gender, email, phone, address_id, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING user_id`,
-        [firstName, lastName, dateOfBirth, gender, universityEmail, personalPhone, addressId]
-      );
-      
-      const userId = userProfileResult.rows[0].user_id;
-      
-      // Insert student record
-      await client.query(
-        `INSERT INTO ${schemaPrefix}.students 
-         (user_id, student_number, email, phone, year, status) 
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [userId, studentNumber, universityEmail, phoneNumber, yearOfStudy, 'enrolled']
-      );
-      
-      await client.query('COMMIT');
-      
-      console.log('Student added successfully with ID:', userId);
-      
-      return res.status(201).json({
-        id: userId,
-        firstName,
-        lastName,
-        email: universityEmail,
-        studentNumber,
-        yearOfStudy,
-        role: 'student'
-      });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Transaction error:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-    */
+    
   } catch (error) {
     console.error('Add student error:', error);
     return res.status(500).json({ message: 'Internal server error' });
@@ -482,63 +426,7 @@ export const addAcademicStaff = async (req: Request, res: Response) => {
       role: 'academic_staff'
     });
     
-    /* Commented out actual database implementation for now
-    // Start a transaction
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      // Create address if provided
-      let addressId = null;
-      if (address) {
-        const addressResult = await client.query(
-          `INSERT INTO ${schemaPrefix}.addresses 
-           (line1, line2, city, state, postal_code, country, created_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id`,
-          [address.street, null, address.city, null, address.postalCode, address.country]
-        );
-        addressId = addressResult.rows[0].id;
-      }
-      
-      // Insert user profile
-      const userProfileResult = await client.query(
-        `INSERT INTO ${schemaPrefix}.user_profiles 
-         (first_name, last_name, date_of_birth, gender, email, phone, address_id, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING user_id`,
-        [firstName, lastName, dateOfBirth, gender, universityEmail, personalPhone, addressId]
-      );
-      
-      const userId = userProfileResult.rows[0].user_id;
-      
-      // Insert staff record
-      await client.query(
-        `INSERT INTO ${schemaPrefix}.staff 
-         (user_id, staff_number, title, email, phone, address_id, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [userId, staffId, position, universityEmail, personalPhone, addressId]
-      );
-      
-      await client.query('COMMIT');
-      
-      console.log('Academic staff added successfully with ID:', userId);
-      
-      return res.status(201).json({
-        id: userId,
-        firstName,
-        lastName,
-        email: universityEmail,
-        staffId,
-        position,
-        role: 'academic_staff'
-      });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Transaction error:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-    */
+
   } catch (error) {
     console.error('Add academic staff error:', error);
     return res.status(500).json({ message: 'Internal server error' });
@@ -564,85 +452,6 @@ export const deleteUserInDepartment = async (req: Request, res: Response) => {
     // Return a mock success response
     return res.status(200).json({ message: 'User deleted successfully' });
     
-    /* Commented out actual database implementation for now
-    // Start a transaction
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
-      // Check if user exists in the department
-      const userResult = await client.query(
-        `SELECT user_id FROM ${schemaPrefix}.user_profiles WHERE user_id = $1`,
-        [userId]
-      );
-      
-      if (userResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ message: 'User not found in this department' });
-      }
-      
-      // Check if user is a student
-      const studentResult = await client.query(
-        `SELECT user_id FROM ${schemaPrefix}.students WHERE user_id = $1`,
-        [userId]
-      );
-      
-      if (studentResult.rows.length > 0) {
-        // Delete student record
-        await client.query(
-          `DELETE FROM ${schemaPrefix}.students WHERE user_id = $1`,
-          [userId]
-        );
-      }
-      
-      // Check if user is academic staff
-      const staffResult = await client.query(
-        `SELECT staff_id FROM ${schemaPrefix}.staff WHERE user_id = $1`,
-        [userId]
-      );
-      
-      if (staffResult.rows.length > 0) {
-        // Delete staff record
-        await client.query(
-          `DELETE FROM ${schemaPrefix}.staff WHERE user_id = $1`,
-          [userId]
-        );
-      }
-      
-      // Get address ID before deleting user profile
-      const addressResult = await client.query(
-        `SELECT address_id FROM ${schemaPrefix}.user_profiles WHERE user_id = $1`,
-        [userId]
-      );
-      
-      const addressId = addressResult.rows[0]?.address_id;
-      
-      // Delete user profile
-      await client.query(
-        `DELETE FROM ${schemaPrefix}.user_profiles WHERE user_id = $1`,
-        [userId]
-      );
-      
-      // Delete address if it exists
-      if (addressId) {
-        await client.query(
-          `DELETE FROM ${schemaPrefix}.addresses WHERE id = $1`,
-          [addressId]
-        );
-      }
-      
-      await client.query('COMMIT');
-      
-      console.log(`User ${userId} deleted successfully from ${schemaPrefix}`);
-      return res.status(200).json({ message: 'User deleted successfully' });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Transaction error:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-    */
   } catch (error) {
     console.error('Delete user error:', error);
     return res.status(500).json({ message: 'Internal server error' });

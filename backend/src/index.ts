@@ -20,6 +20,7 @@ import timetableRoutes from './routes/timetable.routes';
 import staffRoutes from './routes/staff.routes';
 import departmentAdminRoutes from './routes/departmentAdmin/departmentAdminRoutes';
 import centralAdminRoutes from './routes/centralAdmin/centralAdminRoutes';
+import adminRoutes from './routes/centralAdmin/adminRoutes';
 import studentRoutes from './routes/student.routes';
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api/timetable', timetableRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/department', departmentAdminRoutes);
 app.use('/api/central', centralAdminRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api', userRoutes);
 

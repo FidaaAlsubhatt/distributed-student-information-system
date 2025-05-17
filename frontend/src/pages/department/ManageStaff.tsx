@@ -61,13 +61,18 @@ const ManageStaff: React.FC = () => {
     if (!deptCode) return;
     setIsLoading(true);
     
-    // Use the revised endpoint for staff data
+    // Get staff data using the departmentAdmin endpoint
     api.getDepartmentStaff(deptCode)
       .then((response: any) => {
-        // Backend returns data in { users: [...] } format
+        // Backend controller returns data in { users: [...], department: '...' } format
         if (response && response.users && Array.isArray(response.users)) {
           setStaff(response.users);
+          // Update document title with department name if available
+          if (response.department) {
+            document.title = `Staff Management - ${response.department}`;
+          }
         } else if (Array.isArray(response)) {
+          // Handle direct array response for backward compatibility
           setStaff(response);
         } else {
           console.error('Unexpected staff data format:', response);
@@ -113,6 +118,12 @@ const ManageStaff: React.FC = () => {
   const onSubmit = async (data: CreateStaffData) => {
     setIsSubmitting(true);
     try {
+      // Format date to YYYY-MM-DD for backend compatibility
+      if (data.dateOfBirth) {
+        const date = new Date(data.dateOfBirth);
+        data.dateOfBirth = date.toISOString().split('T')[0];
+      }
+      
       // Send staff data to the backend
       const response = await api.addAcademicStaff(data, deptCode);
       
@@ -147,10 +158,16 @@ const ManageStaff: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-      // Send updated data to the backend
+      // Format date to YYYY-MM-DD for backend compatibility
+      if (data.dateOfBirth) {
+        const date = new Date(data.dateOfBirth);
+        data.dateOfBirth = date.toISOString().split('T')[0];
+      }
+      
+      // Send update to backend with role explicitly set
       await api.updateStaff(selectedStaff.id, {
         ...data,
-        role: 'academic_staff' 
+        role: 'academic_staff' // Ensure role is included
       }, deptCode);
       
       // Update the staff list
@@ -219,21 +236,34 @@ const ManageStaff: React.FC = () => {
       <div className="flex space-x-2">
         <Button 
           variant="ghost" 
-          size="icon" 
+          size="sm" 
           onClick={() => {
-            // Pre-populate form with staff data
+            setSelectedStaff(s);
+            // Format date for HTML date input (expects YYYY-MM-DD)
+            let formattedDate = s.dateOfBirth;
+            try {
+              // Parse UK format (DD/MM/YYYY) to ISO format (YYYY-MM-DD)
+              if (s.dateOfBirth && s.dateOfBirth.includes('/')) {
+                const [day, month, year] = s.dateOfBirth.split('/');
+                formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+            } catch (e) {
+              console.error('Error parsing date:', e);
+              // Keep original if parsing fails
+            }
+
+            // Initialize form with staff data
             form.reset({
               firstName: s.firstName,
               lastName: s.lastName,
-              email: s.email,
-              gender: (s.gender as "male" | "female" | "other" | "prefer_not_to_say"),
-              dateOfBirth: s.dateOfBirth,
               staffId: s.staffId,
               position: s.position,
-              universityEmail: s.universityEmail || s.email,
-              role: 'academic_staff'  // Add the required role field for validation
+              universityEmail: s.universityEmail,
+              email: s.email, 
+              gender: s.gender as any,
+              dateOfBirth: formattedDate,
+              role: 'academic_staff'
             });
-            setSelectedStaff(s);
             setIsEditDialogOpen(true);
           }}
         >

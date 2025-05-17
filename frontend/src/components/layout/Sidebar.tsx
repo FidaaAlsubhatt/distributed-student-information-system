@@ -261,12 +261,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             ],
           },
           {
-            name: 'Module Management',
+            name: 'Time Tabling',
             icon: 'fa-solid fa-book',
             id: 'modules',
             children: [
-              { name: 'Approve Enrollments', id: '/approve-enrollments' },
-              { name: 'Classes & Exams', id: '/classes-exams' },
+              { name: 'Exams', id: '/exams' },
+              { name: 'Classes', id: '/classes' },
             ],
           },
           {
@@ -326,8 +326,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             id: 'security',
             children: [
               { name: 'System Logs', id: '/system-logs' },
-              { name: 'Login Attempts', id: '/login-attempts' },
-              { name: 'Audit Trail', id: '/audit-trail' },
               { name: 'Role Permissions', id: '/role-permissions' },
             ],
           },

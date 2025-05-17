@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
-import { useDepartments, useCreateAdmin } from '@/hooks/use-users';
+import { useDepartments, useUpdateAdmin } from '@/hooks/use-users';
 
 import {
   Dialog,
@@ -27,87 +27,75 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 // Form validation schema
 const formSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
   firstName: z.string().min(2, { message: 'First name is required' }),
   lastName: z.string().min(2, { message: 'Last name is required' }),
-  role: z.enum(['central_admin', 'department_admin']),
   departmentId: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'suspended']),
 });
 
 // Form values type
 type FormValues = z.infer<typeof formSchema>;
 
-interface AdminUserFormProps {
+interface AdminUser {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  department?: string;
+  departmentId?: string;
+  status: string;
+}
+
+interface AdminEditFormProps {
+  admin: AdminUser;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const AdminUserForm: React.FC<AdminUserFormProps> = ({ isOpen, onClose }) => {
+const AdminEditForm: React.FC<AdminEditFormProps> = ({ admin, isOpen, onClose }) => {
   const { toast } = useToast();
-  const createAdminMutation = useCreateAdmin();
+  const updateAdminMutation = useUpdateAdmin();
   const { data: departments = [], isLoading: isLoadingDepartments } = useDepartments();
-  const [showDepartmentField, setShowDepartmentField] = useState(false);
+  const showDepartmentField = admin.role === 'department_admin';
 
-  // Initialize form
+  // Initialize form with admin data
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
-      password: '',
-      firstName: '',
-      lastName: '',
-      role: 'central_admin',
-      departmentId: undefined,
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      departmentId: admin.departmentId,
+      status: admin.status as 'active' | 'inactive' | 'suspended',
     },
   });
-
-  // Handle role change to show/hide department field
-  const handleRoleChange = (value: string) => {
-    form.setValue('role', value as 'central_admin' | 'department_admin');
-    setShowDepartmentField(value === 'department_admin');
-    
-    // Clear department selection if central admin
-    if (value === 'central_admin') {
-      form.setValue('departmentId', undefined);
-    }
-  };
 
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
     try {
-      // Validate that department is selected for department admins
-      if (data.role === 'department_admin' && !data.departmentId) {
-        toast({
-          title: 'Error',
-          description: 'Please select a department for the department admin.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Use our new admin creation API
-      await createAdminMutation.mutateAsync({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: data.role,
-        departmentId: data.departmentId
+      // Update the admin
+      await updateAdminMutation.mutateAsync({
+        adminId: admin.userId,
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          departmentId: showDepartmentField ? data.departmentId : undefined,
+          status: data.status,
+        } as any, // Type assertion to avoid TypeScript errors
       });
       
       toast({
         title: 'Success',
-        description: `${data.role === 'central_admin' ? 'Central' : 'Department'} admin created successfully.`,
+        description: 'Administrator updated successfully.',
       });
       
-      form.reset();
       onClose();
     } catch (error) {
-      console.error('Error creating admin:', error);
+      console.error('Error updating admin:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create admin. Please try again.',
+        description: 'Failed to update administrator. Please try again.',
         variant: 'destructive',
       });
     }
@@ -117,41 +105,27 @@ const AdminUserForm: React.FC<AdminUserFormProps> = ({ isOpen, onClose }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Admin User</DialogTitle>
+          <DialogTitle>Edit Administrator</DialogTitle>
           <DialogDescription>
-            Add a new central or department administrator to the system.
+            Update the administrator details. Email and role cannot be changed.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="admin@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div>
+              <label className="text-sm font-medium">Email</label>
+              <div className="p-2 border rounded-md bg-muted mt-1">
+                {admin.email}
+              </div>
+            </div>
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div>
+              <label className="text-sm font-medium">Role</label>
+              <div className="p-2 border rounded-md bg-muted mt-1">
+                {admin.role === 'central_admin' ? 'Central Admin' : 'Department Admin'}
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -185,22 +159,23 @@ const AdminUserForm: React.FC<AdminUserFormProps> = ({ isOpen, onClose }) => {
 
             <FormField
               control={form.control}
-              name="role"
+              name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Admin Type</FormLabel>
+                  <FormLabel>Status</FormLabel>
                   <Select 
-                    onValueChange={handleRoleChange} 
+                    onValueChange={field.onChange} 
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select admin type" />
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="central_admin">Central Admin</SelectItem>
-                      <SelectItem value="department_admin">Department Admin</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -252,9 +227,9 @@ const AdminUserForm: React.FC<AdminUserFormProps> = ({ isOpen, onClose }) => {
               </Button>
               <Button 
                 type="submit" 
-                disabled={createAdminMutation.isLoading}
+                disabled={updateAdminMutation.isLoading}
               >
-                {createAdminMutation.isLoading ? 'Creating...' : 'Create Admin'}
+                {updateAdminMutation.isLoading ? 'Updating...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </form>
@@ -264,4 +239,4 @@ const AdminUserForm: React.FC<AdminUserFormProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default AdminUserForm;
+export default AdminEditForm;

@@ -3,7 +3,6 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
@@ -11,7 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns';
 import { 
   AreaChart, 
-  BarChart, 
   ResponsiveContainer, 
   Area, 
   XAxis, 
@@ -19,14 +17,11 @@ import {
   CartesianGrid, 
   Tooltip,
   Bar,
-  Cell,
-  TooltipProps 
-} from 'recharts';
+} 
+from 'recharts';
 import TableList from '@/components/dashboard/TableList';
 import { systemHealth } from '@/data/mockData';
 import { 
-  Lock, 
-  Shield, 
   AlertTriangle, 
   CheckCircle, 
   XCircle, 
@@ -35,9 +30,7 @@ import {
   Calendar as CalendarIcon, 
   Search, 
   UserX, 
-  LogIn,
   Users,
-  UserPlus,
   Eye,
   FileText,
   Server,
@@ -409,25 +402,6 @@ const SecurityMonitoring: React.FC = () => {
         
         {/* Security Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16">
-              <div className="absolute transform rotate-45 bg-green-600 text-white font-semibold py-1 right-[-35px] top-[25px] w-[140px] text-center text-xs">
-                SECURE
-              </div>
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">System Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <Shield className="h-8 w-8 text-green-600 mr-3" />
-                <div>
-                  <div className="text-2xl font-bold">Protected</div>
-                  <p className="text-sm text-gray-500">All systems operational</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
           
           <Card>
             <CardHeader className="pb-2">
@@ -479,51 +453,12 @@ const SecurityMonitoring: React.FC = () => {
           </Card>
         </div>
         
-        {/* Login Attempts Chart */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Login Attempts (24 Hours)</CardTitle>
-                <CardDescription>Successful vs. failed login attempts</CardDescription>
-              </div>
-              <Button variant="outline" size="sm">
-                <FileText className="h-4 w-4 mr-2" />
-                Full Report
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={loginAttempts}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 20,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="hour" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="success" fill="#8884d8" name="Successful" />
-                  <Bar dataKey="failed" fill="#ff8a65" name="Failed" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
         
         {/* Tabs for different security aspects */}
         <Tabs defaultValue="logs" value={currentTab} onValueChange={setCurrentTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="logs">Security Logs</TabsTrigger>
-            <TabsTrigger value="alerts">System Alerts</TabsTrigger>
             <TabsTrigger value="roles">User Roles & Permissions</TabsTrigger>
-            <TabsTrigger value="connections">Network Connections</TabsTrigger>
           </TabsList>
           
           <TabsContent value="logs" className="m-0">
@@ -551,114 +486,14 @@ const SecurityMonitoring: React.FC = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="alerts" className="m-0">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>System Alerts</CardTitle>
-                  <div className="flex gap-3">
-                    <Select defaultValue={alertFilter} onValueChange={setAlertFilter}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter alerts" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Alerts</SelectItem>
-                        <SelectItem value="critical">Critical Only</SelectItem>
-                        <SelectItem value="warning">Warnings Only</SelectItem>
-                        <SelectItem value="healthy">Healthy Only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="relative w-64">
-                      <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <Input
-                        placeholder="Search alerts..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <TableList
-                  columns={alertColumns}
-                  data={filteredAlerts}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
           
           <TabsContent value="roles" className="m-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Role Distribution</CardTitle>
-                  <CardDescription>Users by role type</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={userRoles}
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 20,
-                          bottom: 40,
-                        }}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="role" width={150} />
-                        <Tooltip />
-                        <Bar dataKey="users" fill="#82ca9d" name="Number of Users" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Permission Distribution</CardTitle>
-                  <CardDescription>Permissions by role</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={userRoles}
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 20,
-                          bottom: 40,
-                        }}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis type="category" dataKey="role" width={150} />
-                        <Tooltip />
-                        <Bar dataKey="permissions" fill="#8884d8" name="Number of Permissions" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
             
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Role Management</CardTitle>
                   <div className="flex gap-3">
-                    <Button variant="outline" size="sm">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Create Role
-                    </Button>
                     <div className="relative w-64">
                       <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                       <Input
@@ -774,75 +609,10 @@ const SecurityMonitoring: React.FC = () => {
                   </ResponsiveContainer>
                 </div>
                 
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-2">Network Statistics</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Peak Traffic</span>
-                        <span className="font-medium">562 MB/s (09:45 AM)</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Average Load</span>
-                        <span className="font-medium">320 MB/s</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Total Data Transferred</span>
-                        <span className="font-medium">28.4 TB today</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-medium mb-2">Top Connections</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Main Campus WiFi</span>
-                        <span className="font-medium">245 MB/s</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Student Dormitories</span>
-                        <span className="font-medium">185 MB/s</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Administrative Network</span>
-                        <span className="font-medium">120 MB/s</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-        
-        {/* Security Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Actions</CardTitle>
-            <CardDescription>Quick access to common security operations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-auto py-6 flex flex-col items-center">
-                <Shield className="h-8 w-8 mb-2 text-blue-600" />
-                <span className="text-center">Run Security Scan</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col items-center">
-                <Lock className="h-8 w-8 mb-2 text-green-600" />
-                <span className="text-center">Update Permissions</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col items-center">
-                <RefreshCw className="h-8 w-8 mb-2 text-purple-600" />
-                <span className="text-center">Reset Security Tokens</span>
-              </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col items-center">
-                <Download className="h-8 w-8 mb-2 text-amber-600" />
-                <span className="text-center">Export Security Report</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );
