@@ -300,9 +300,18 @@ const ManageStudents: React.FC = () => {
                     <FormLabel>Year</FormLabel>
                     <FormControl>
                       <Select onValueChange={v=>field.onChange(Number(v))} defaultValue={String(field.value)}>
-                        {[1,2,3,4,5,6,7].map(y=>(
-                          <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>
-                        ))}
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem key="add-year-1" value="1">Year 1</SelectItem>
+                          <SelectItem key="add-year-2" value="2">Year 2</SelectItem>
+                          <SelectItem key="add-year-3" value="3">Year 3</SelectItem>
+                          <SelectItem key="add-year-4" value="4">Year 4</SelectItem>
+                          <SelectItem key="add-year-5" value="5">Year 5</SelectItem>
+                          <SelectItem key="add-year-6" value="6">Year 6</SelectItem>
+                          <SelectItem key="add-year-7" value="7">Year 7</SelectItem>
+                        </SelectContent>
                       </Select>
                     </FormControl>
                     <FormMessage/>
@@ -313,10 +322,15 @@ const ManageStudents: React.FC = () => {
                     <FormLabel>Gender</FormLabel>
                     <FormControl>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                        <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem key="add-gender-male" value="male">Male</SelectItem>
+                          <SelectItem key="add-gender-female" value="female">Female</SelectItem>
+                          <SelectItem key="add-gender-other" value="other">Other</SelectItem>
+                          <SelectItem key="add-gender-prefer" value="prefer_not_to_say">Prefer not to say</SelectItem>
+                        </SelectContent>
                       </Select>
                     </FormControl>
                     <FormMessage/>
@@ -449,9 +463,12 @@ const ManageStudents: React.FC = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[1, 2, 3, 4, 5, 6].map(year => (
-                            <SelectItem key={year} value={String(year)}>Year {year}</SelectItem>
-                          ))}
+                          <SelectItem key="edit-year-1" value="1">Year 1</SelectItem>
+                          <SelectItem key="edit-year-2" value="2">Year 2</SelectItem>
+                          <SelectItem key="edit-year-3" value="3">Year 3</SelectItem>
+                          <SelectItem key="edit-year-4" value="4">Year 4</SelectItem>
+                          <SelectItem key="edit-year-5" value="5">Year 5</SelectItem>
+                          <SelectItem key="edit-year-6" value="6">Year 6</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -474,10 +491,10 @@ const ManageStudents: React.FC = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                          <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                          <SelectItem key="edit-gender-male" value="male">Male</SelectItem>
+                          <SelectItem key="edit-gender-female" value="female">Female</SelectItem>
+                          <SelectItem key="edit-gender-other" value="other">Other</SelectItem>
+                          <SelectItem key="edit-gender-prefer" value="prefer_not_to_say">Prefer not to say</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

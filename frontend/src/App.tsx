@@ -26,7 +26,6 @@ import AcademicDashboard from "@/pages/academic/Dashboard";
 import ManageModules from "@/pages/academic/ManageModules";
 import ManageAssignments from "@/pages/academic/ManageAssignments";
 import GradeAssignments from "@/pages/academic/GradeAssignments";
-import ManageExams from "@/pages/academic/ManageExams";
 import ViewStudents from "@/pages/academic/ViewStudents";
 
 // Department Admin Pages
@@ -36,8 +35,8 @@ import ManageStudents from "@/pages/department/ManageStudents";
 import ManagePrograms from "@/pages/department/ManagePrograms";
 import DepartmentReports from "@/pages/department/Reports";
 import StudentCases from "@/pages/department/StudentCases";
-import DepartmentExams from "@/pages/department/Exams";
-import DepartmentClasses from "@/pages/department/Classes";
+import DepartmentExams from "@/pages/department/ManageExams";
+import DepartmentClasses from "@/pages/department/ManageClasses";
 
 // Central Admin Pages
 import CentralDashboard from "@/pages/central/Dashboard";
@@ -93,9 +92,6 @@ function Router() {
       <Route path="/manage-assignments" component={ManageAssignments} />
       <Route path="/grade-assignments" component={GradeAssignments} />
       <Route path="/provide-feedback" component={GradeAssignments} />
-      <Route path="/manage-exams" component={ManageExams} />
-      <Route path="/schedule-exams" component={ManageExams} />
-      <Route path="/update-exams" component={ManageExams} />
       <Route path="/view-students" component={ViewStudents} />
       
       {/* Department Admin routes */}

@@ -477,10 +477,10 @@ const ManageStaff: React.FC = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                            <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                            <SelectItem key="edit-gender-male" value="male">Male</SelectItem>
+                            <SelectItem key="edit-gender-female" value="female">Female</SelectItem>
+                            <SelectItem key="edit-gender-other" value="other">Other</SelectItem>
+                            <SelectItem key="edit-gender-prefer" value="prefer_not_to_say">Prefer not to say</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
