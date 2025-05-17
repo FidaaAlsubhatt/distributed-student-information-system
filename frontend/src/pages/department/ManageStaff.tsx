@@ -118,14 +118,31 @@ const ManageStaff: React.FC = () => {
   const onSubmit = async (data: CreateStaffData) => {
     setIsSubmitting(true);
     try {
-      // Format date to YYYY-MM-DD for backend compatibility
-      if (data.dateOfBirth) {
+      // Ensure date format is YYYY-MM-DD for backend compatibility
+      // but don't try to convert if it's already in that format
+      let dateOfBirth = data.dateOfBirth;
+      if (data.dateOfBirth && !data.dateOfBirth.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const date = new Date(data.dateOfBirth);
-        data.dateOfBirth = date.toISOString().split('T')[0];
+        dateOfBirth = date.toISOString().split('T')[0];
       }
       
+      // Create a new staff data object with all required fields
+      const staffData = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        staffId: data.staffId,
+        position: data.position,
+        universityEmail: data.universityEmail,
+        email: data.email,
+        gender: data.gender || 'prefer_not_to_say',
+        dateOfBirth: dateOfBirth || new Date().toISOString().split('T')[0],
+        role: 'academic_staff' as const
+      };
+      
+      console.log('Submitting staff data:', staffData);
+      
       // Send staff data to the backend
-      const response = await api.addAcademicStaff(data, deptCode);
+      const response = await api.addAcademicStaff(staffData, deptCode);
       
       // Handle the response structure returned by our backend
       const added = response.user || response;
@@ -323,19 +340,26 @@ const ManageStaff: React.FC = () => {
                     <FormMessage/>
                   </FormItem>
                 )}/>
+                <FormField name="email" control={form.control} render={({field})=>(
+                  <FormItem>
+                    <FormLabel>Personal Email</FormLabel>
+                    <FormControl><Input type="email" {...field}/></FormControl>
+                    <FormMessage/>
+                  </FormItem>
+                )}/>
                 <FormField name="gender" control={form.control} render={({field})=>(
                   <FormItem>
                     <FormLabel>Gender</FormLabel>
                     <FormControl>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || 'prefer_not_to_say'}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select gender" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                          <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                          <SelectItem key="add-gender-male" value="male">Male</SelectItem>
+                          <SelectItem key="add-gender-female" value="female">Female</SelectItem>
+                          <SelectItem key="add-gender-other" value="other">Other</SelectItem>
+                          <SelectItem key="add-gender-prefer" value="prefer_not_to_say">Prefer not to say</SelectItem>
                         </SelectContent>
                       </Select>
                     </FormControl>

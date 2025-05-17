@@ -6,65 +6,11 @@ import NotificationItem from '@/components/dashboard/NotificationItem';
 import TableList from '@/components/dashboard/TableList';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { departmentStats, notifications, modules, studentCases } from '@/data/mockData';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  AreaChart, 
-  BarChart, 
-  ResponsiveContainer, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip,
-  Bar,
-  Cell,
-  TooltipProps 
-} from 'recharts';
-import { UserPlus, BookOpen, Award, BookCopy, Users, Calendar, AlertTriangle } from 'lucide-react';
+import { UserPlus, BookOpen, Calendar, AlertTriangle } from 'lucide-react';
 
-// Mock data for charts
-const enrollmentTrends = [
-  { month: 'Jan', count: 120 },
-  { month: 'Feb', count: 140 },
-  { month: 'Mar', count: 190 },
-  { month: 'Apr', count: 210 },
-  { month: 'May', count: 220 },
-  { month: 'Jun', count: 170 },
-  { month: 'Jul', count: 180 },
-  { month: 'Aug', count: 240 },
-  { month: 'Sep', count: 250 },
-  { month: 'Oct', count: 280 },
-  { month: 'Nov', count: 240 },
-  { month: 'Dec', count: 230 },
-];
-
-const moduleDistribution = [
-  { name: 'CS101', students: 155 },
-  { name: 'CS201', students: 130 },
-  { name: 'CS202', students: 110 },
-  { name: 'CS301', students: 95 },
-  { name: 'CS305', students: 85 },
-  { name: 'CS310', students: 75 },
-  { name: 'CS315', students: 60 },
-  { name: 'CS320', students: 50 },
-];
-
-const gradeDistribution = [
-  { grade: 'A', percentage: 15 },
-  { grade: 'B+', percentage: 22 },
-  { grade: 'B', percentage: 27 },
-  { grade: 'C+', percentage: 18 },
-  { grade: 'C', percentage: 12 },
-  { grade: 'D', percentage: 4 },
-  { grade: 'F', percentage: 2 },
-];
-
-const colors = [
-  '#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658', '#ff8a65'
-];
 
 const DepartmentDashboard: React.FC = () => {
   // Top modules columns
@@ -222,34 +168,6 @@ const DepartmentDashboard: React.FC = () => {
           </div>
         </DashboardCard>
         
-        {/* Notifications & Urgent Cases */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DashboardCard 
-            title="Recent Notifications" 
-            footerLink={{ url: '/notifications', text: 'View All Notifications' }}
-          >
-            <div className="space-y-4 mt-2">
-              {notifications.slice(0, 3).map((notification) => (
-                <NotificationItem 
-                  key={notification.id} 
-                  notification={notification} 
-                />
-              ))}
-            </div>
-          </DashboardCard>
-          
-          <DashboardCard 
-            title="Student Cases Requiring Attention" 
-            footerLink={{ url: '/student-cases', text: 'View All Cases' }}
-          >
-            <div className="space-y-4 mt-2">
-              <TableList 
-                columns={studentCaseColumns}
-                data={studentCases.filter(c => c.status !== 'resolved').slice(0, 3)}
-              />
-            </div>
-          </DashboardCard>
-        </div>
         
         {/* Top Modules */}
         <DashboardCard 
