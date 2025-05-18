@@ -51,18 +51,18 @@ const EnrollmentForm: React.FC = () => {
         const data = await getAvailableModules();
         
         // Process modules to ensure unique identification
-        const modulesWithCompositeIds = data.modules.map((module, index) => {
+        const modulesWithCompositeIds = data.modules.map((module) => {
           // Create a formatted display name with department for global modules
           const displayName = module.isGlobalModule ? 
             `${module.code} - ${module.title} (${module.departmentCode?.toUpperCase()})` : 
             `${module.code} - ${module.title}`;
           
-          // Create a guaranteed unique composite ID by combining departmentCode and moduleId
-          // This is the key to preventing ID conflicts between departments
-          const compositeId = `${module.departmentCode || departmentCode}:${module.id}`;
+          // Use the globalModuleId from backend if available, otherwise create a composite ID
+          // This ensures consistent identification across frontend and backend
+          const compositeId = module.globalModuleId || `${module.departmentCode || departmentCode}:${module.id}`;
           
-          // Log the composite ID creation for debugging
-          console.log(`Creating composite ID for ${module.code}:`, compositeId);
+          // Log the module ID information for debugging
+          console.log(`Module ${module.code} - globalModuleId: ${module.globalModuleId}, compositeId: ${compositeId}`);
           
           return {
             ...module,
@@ -133,8 +133,11 @@ const EnrollmentForm: React.FC = () => {
       console.log('Form values on submit:', values);
       console.log('Looking for module with compositeId:', compositeId);
       
-      // Find the module by its composite ID - this ensures we get the exact module that was selected
-      const moduleForRequest = modules.find(m => m.compositeId === compositeId);
+      // Find the module by its composite ID or globalModuleId - this ensures we get the exact module that was selected
+      const moduleForRequest = modules.find(m => 
+        m.compositeId === compositeId || 
+        m.globalModuleId === compositeId
+      );
       
       if (!moduleForRequest) {
         console.error('No module found with compositeId:', compositeId);
@@ -144,17 +147,66 @@ const EnrollmentForm: React.FC = () => {
       // The module ID to send to the backend is just the numeric part
       const actualModuleId = moduleForRequest.id;
       
+      // Normalize module object to handle case sensitivity issues
+      // Create a normalized version of the module with consistent property names
+      const normalizedModule = {
+        id: moduleForRequest.id,
+        title: moduleForRequest.title,
+        code: moduleForRequest.code,
+        departmentId: moduleForRequest.departmentId || 
+                     (moduleForRequest as any).departmentid || 
+                     (moduleForRequest as any).DepartmentId,
+        departmentCode: moduleForRequest.departmentCode || 
+                       (moduleForRequest as any).departmentcode || 
+                       (moduleForRequest as any).DepartmentCode,
+        isGlobalModule: Boolean(
+          moduleForRequest.isGlobalModule || 
+          (moduleForRequest as any).isglobalmodule || 
+          (moduleForRequest as any).IsGlobalModule
+        )
+      };
+      
+      // Enhanced logging to debug module selection
       console.log('Selected module for enrollment:', moduleForRequest);
-      console.log('Module department:', moduleForRequest.departmentCode);
-      console.log('Module is global:', moduleForRequest.isGlobalModule);
+      console.log('Normalized module properties:', normalizedModule);
+      console.log('Student departmentId:', departmentId);
       console.log('Submitting enrollment request with ID:', actualModuleId);
       
-      // Submit enrollment request with department info if it's a global module
+      // Check if this is actually a global module from another department
+      const isFromDifferentDepartment = normalizedModule.departmentId !== departmentId;
+      const isGlobalModule = normalizedModule.isGlobalModule || isFromDifferentDepartment;
+      
+      console.log('Is from different department:', isFromDifferentDepartment);
+      console.log('Final isGlobalModule flag:', isGlobalModule);
+      
+      // For global modules, we MUST use the module's department ID (not the student's)
+      // For local modules, we use the student's department ID
+      let targetDepartmentId: number | undefined;
+      
+      if (isGlobalModule) {
+        // For global modules, use the module's department ID
+        if (!normalizedModule.departmentId) {
+          console.error('Missing departmentId for global module:', moduleForRequest);
+          console.error('Available properties:', Object.keys(moduleForRequest).join(', '));
+          throw new Error('Department ID is required for global module enrollment');
+        }
+        
+        targetDepartmentId = Number(normalizedModule.departmentId); // Ensure it's a number
+        console.log('Using module department ID:', targetDepartmentId);
+      } else {
+        // For local modules, use the student's department ID
+        targetDepartmentId = departmentId || undefined;
+        console.log('Using student department ID:', targetDepartmentId);
+      }
+      
+      console.log('Using departmentId for request:', targetDepartmentId);
+      
+      // Submit enrollment request with correct department info and global module flag
       await requestEnrollment(
         actualModuleId, 
         values.reason,
-        moduleForRequest.departmentId,
-        moduleForRequest.isGlobalModule
+        targetDepartmentId, // Already properly typed as number | undefined
+        isGlobalModule
       );
       
       let requestDescription = `Your request for ${moduleForRequest.code} - ${moduleForRequest.title}`;

@@ -56,8 +56,11 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Special handling for the template accounts during development
-    const isTemplateAccount = ['math.admin@university.ac.uk', 
-                             'cs.admin@university.ac.uk', 'central.admin@university.ac.uk'].includes(email);
+    // Use case-insensitive comparison for template accounts
+    const templateAccounts = ['math.admin@university.ac.uk', 
+                            'cs.admin@university.ac.uk', 'central.admin@university.ac.uk'];
+    const isTemplateAccount = templateAccounts.some(template => 
+      template.toLowerCase() === email.toLowerCase());
     
     console.log(`Checking password for ${email}, hash: ${user.password_hash.substring(0, 20)}...`);
     console.log(`Is template account: ${isTemplateAccount}`);

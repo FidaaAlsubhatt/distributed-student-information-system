@@ -33,6 +33,7 @@ import DepartmentDashboard from "@/pages/department/Dashboard";
 import ManageStaff from "@/pages/department/ManageStaff";
 import ManageStudents from "@/pages/department/ManageStudents";
 import ManagePrograms from "@/pages/department/ManagePrograms";
+import ManageEnrollments from "@/pages/department/ManageEnrollments";
 import DepartmentReports from "@/pages/department/Reports";
 import StudentCases from "@/pages/department/StudentCases";
 import DepartmentExams from "@/pages/department/ManageExams";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/manage-students" component={ManageStudents} />
       <Route path="/manage-staff" component={ManageStaff} />  
       <Route path="/manage-programs" component={ManagePrograms} />
+      <Route path="/manage-enrollments" component={ManageEnrollments} />
       <Route path="/student-reports" component={DepartmentReports} />
       <Route path="/dept-performance" component={DepartmentReports} />
       <Route path="/suspension-records" component={StudentCases} />

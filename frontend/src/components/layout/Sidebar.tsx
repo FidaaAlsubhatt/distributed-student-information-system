@@ -253,11 +253,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             ],
           },
           {
-            name: 'Manage Programs',
+            name: 'Programs & Enrollments',
             icon: 'fa-solid fa-book',
-            id: 'manage-programs',
+            id: 'programs-enrollments',
             children: [
               { name: 'Manage Programs', id: '/manage-programs' },
+              { name: 'Manage Enrollments', id: '/manage-enrollments' },
             ],
           },
           {

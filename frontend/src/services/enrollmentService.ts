@@ -1,20 +1,19 @@
 import axios from 'axios';
 
-// Helper function to get the authentication token
+// Helper to extract auth token from localStorage
 const getAuthToken = (): string | null => {
-  const authJson = localStorage.getItem('auth');
-  if (!authJson) return null;
-  
   try {
+    const authJson = localStorage.getItem('auth');
+    if (!authJson) return null;
     const auth = JSON.parse(authJson);
-    return auth.token || null;
+    return auth?.token ?? null;
   } catch (error) {
     console.error('Error parsing auth JSON:', error);
     return null;
   }
 };
 
-// Configure axios with auth headers
+// Authenticated Axios instance
 const authAxios = axios.create();
 
 authAxios.interceptors.request.use(config => {
@@ -25,23 +24,26 @@ authAxios.interceptors.request.use(config => {
   return config;
 });
 
+// -----------------------------
 // Types
+// -----------------------------
+
 export interface Module {
   id: string;
   title: string;
   code: string;
   credits: number;
-  academicYear: number;
   semester: number;
-  isOptional: boolean;
+  isOptional?: boolean;
   isEnrolled: boolean;
   isPending: boolean;
-  departmentCode?: string;
-  departmentId?: number;
-  isGlobalModule?: boolean;
-  compositeId?: string; // Added to support unique module identification across departments
-  uniqueKey?: string; // Added to ensure unique React keys in lists
-  displayName?: string; // For formatted display in the UI
+  departmentCode: string;
+  departmentId: number;
+  isGlobalModule: boolean;
+  globalModuleId: string;    // e.g., "5-2"
+  displayName?: string;
+  compositeId?: string;
+  uniqueKey?: string;
 }
 
 export interface EnrollmentRequest {
@@ -55,12 +57,20 @@ export interface EnrollmentRequest {
   reviewDate?: string;
   reviewerNotes?: string;
   reviewedBy?: string;
-  isGlobalModule?: boolean;
+  isGlobalModule: boolean;
   departmentCode?: string;
+  globalModuleId?: string;
 }
 
-// API Functions
-export const getAvailableModules = async (): Promise<{modules: Module[], departmentCode: string}> => {
+// -----------------------------
+// API Calls
+// -----------------------------
+
+export const getAvailableModules = async (): Promise<{
+  modules: Module[];
+  departmentCode: string;
+  departmentId: number;
+}> => {
   try {
     const response = await authAxios.get('/api/student/enrollment/available-modules');
     return response.data;
@@ -70,14 +80,30 @@ export const getAvailableModules = async (): Promise<{modules: Module[], departm
   }
 };
 
-export const requestEnrollment = async (moduleId: string, reason: string, departmentId?: number, isGlobalModule?: boolean): Promise<{message: string, requestId: string, isGlobalModule?: boolean}> => {
+export const requestEnrollment = async (
+  moduleId: string,
+  reason: string,
+  departmentId?: number,
+  isGlobalModule?: boolean
+): Promise<{
+  message: string;
+  requestId: string;
+  isGlobalModule?: boolean;
+  moduleCode?: string;
+  departmentCode?: string;
+}> => {
   try {
-    const response = await authAxios.post('/api/student/enrollment/request', { 
-      moduleId, 
+    // Ensure fields are always sent
+    const payload = {
+      moduleId,
       reason,
-      departmentId: isGlobalModule ? departmentId : undefined,
-      isGlobalModule
-    });
+      isGlobalModule: !!isGlobalModule,
+      departmentId: departmentId ?? null
+    };
+
+    console.log('Sending enrollment request payload:', payload);
+
+    const response = await authAxios.post('/api/student/enrollment/request', payload);
     return response.data;
   } catch (error) {
     console.error('Error requesting enrollment:', error);
@@ -86,6 +112,11 @@ export const requestEnrollment = async (moduleId: string, reason: string, depart
 };
 
 export const getEnrollmentRequests = async (): Promise<EnrollmentRequest[]> => {
-  const response = await authAxios.get('/api/student/enrollment/requests');
-  return response.data;
+  try {
+    const response = await authAxios.get('/api/student/enrollment/requests');
+    return response.data.requests; // be sure your controller returns { requests: [...] }
+  } catch (error) {
+    console.error('Error fetching enrollment requests:', error);
+    throw error;
+  }
 };

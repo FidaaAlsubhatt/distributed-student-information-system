@@ -86,4 +86,21 @@ router.get('/programs/:programId/students', studentController.getProgramStudents
 // DELETE /api/department/programs/:programId/students/:studentId - Remove student from a program
 router.delete('/programs/:programId/students/:studentId', studentController.removeStudentFromProgram);
 
+
+// -----------------------------
+// Enrollment Management Routes
+// -----------------------------
+import * as enrollmentController from '../../controllers/departmentAdmin/manageEnrolController';
+
+// Test route to check if the router is working
+router.get('/test', (req, res) => {
+  res.status(200).json({ message: 'Department admin router is working!' });
+});
+
+// Unified endpoint for internal and external requests
+router.get('/enrollment-requests', enrollmentController.getDepartmentEnrollmentRequests);
+
+// Unified review endpoint
+router.post('/enrollment-requests/:id/review', enrollmentController.reviewEnrollmentRequest);
+
 export default router;

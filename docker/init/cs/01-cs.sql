@@ -83,9 +83,12 @@ CREATE TABLE modules (
   module_id SERIAL PRIMARY KEY,
   code VARCHAR(20) UNIQUE NOT NULL,
   title VARCHAR(255) NOT NULL,
-  semester_id INT NOT NULL REFERENCES semesters(semester_id),
-  capacity INT NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE
+  semester_id INTEGER NOT NULL REFERENCES semesters(semester_id),
+  capacity INTEGER,
+  is_active BOOLEAN DEFAULT TRUE,
+  description TEXT,
+  credits INTEGER DEFAULT 15,
+  is_global BOOLEAN DEFAULT FALSE
 );
 
 -- Create module_staff table

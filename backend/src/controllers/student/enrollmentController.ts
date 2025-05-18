@@ -104,6 +104,7 @@ export const getAvailableModules = async (req: Request, res: Response) => {
         gm.department_code as departmentCode,
         gm.dept_id as departmentId,
         gm.department_name as departmentName,
+        gm.global_module_id,
         true as isGlobalModule,
         false as isEnrolled,
         false as isPending
@@ -151,10 +152,22 @@ export const getAvailableModules = async (req: Request, res: Response) => {
       }
     }
     
+    // Process local modules to add globalModuleId (to unify UI handling)
+    const localModules = localModulesResult.rows.map(module => ({
+      ...module,
+      globalModuleId: `${module.id}-${module.departmentId}`  // Fake global ID for local modules
+    }));
+
+    // Process global modules to include globalModuleId
+    const processedGlobalModules = globalModules.map(module => ({
+      ...module,
+      globalModuleId: module.global_module_id  // Use the global_module_id from the view
+    }));
+    
     // STEP 4: Combine local and global modules
     const allModules = [
-      ...localModulesResult.rows,
-      ...globalModules // Using the processed globalModules with pending status
+      ...localModules,
+      ...processedGlobalModules // Using the processed globalModules with pending status and globalModuleId
     ];
     
     return res.status(200).json({
@@ -473,7 +486,8 @@ export const getEnrollmentRequests = async (req: Request, res: Response) => {
               module_id::text as moduleId,
               title as moduleTitle,
               code as moduleCode,
-              department_code as departmentCode
+              department_code as departmentCode,
+              global_module_id as globalModuleId
             FROM central.global_modules 
             WHERE dept_id = $1 AND module_id IN (${placeholders})
           `;
@@ -504,7 +518,8 @@ export const getEnrollmentRequests = async (req: Request, res: Response) => {
                 ...request,
                 moduleTitle: moduleDetails.moduleTitle,
                 moduleCode: moduleDetails.moduleCode,
-                departmentCode: moduleDetails.departmentCode || deptCode
+                departmentCode: moduleDetails.departmentCode || deptCode,
+                globalModuleId: moduleDetails.globalModuleId || `${request.moduleId}-${request.departmentId}`
               });
             }
           });
