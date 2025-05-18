@@ -14,8 +14,12 @@ interface EnrollmentRequest {
   reason: string;
   requestDate: string;
   status: 'pending' | 'approved' | 'rejected';
-  type: 'internal' | 'external';  // Changed from isGlobalModule to match backend
-  departmentCode?: string;
+  type: 'internal' | 'external';  // Internal = within department, External = cross-department
+  departmentCode?: string;        // Target department code for external requests
+  sourceDeptCode?: string;        // Source department code (where the student is from)
+  sourceDeptName?: string;        // Source department name (where the student is from)
+  compositeStudentId?: string;    // Format: "deptCode:studentId"
+  compositeModuleId?: string;     // Format: "deptCode:moduleCode"
 }
 
 const ManageEnrollments: React.FC = () => {
@@ -94,10 +98,15 @@ const ManageEnrollments: React.FC = () => {
   const getColumns = (isExternal: boolean) => [
     { key: 'studentEmail', header: 'Student Email' },
     { key: 'moduleCode', header: 'Module Code' },
+    ...(isExternal ? [{ key: 'compositeModuleId', header: 'Module ID', accessor: 'compositeModuleId' }] : []),
     { key: 'moduleTitle', header: 'Title' },
     { key: 'reason', header: 'Reason' },
-    { key: 'requestDate', header: 'Requested At' },
-    ...(isExternal ? [{ key: 'departmentCode', header: 'From Dept', accessor: 'departmentCode' }] : []),
+    { key: 'requestDate', header: 'Requested At', 
+      cell: (req: EnrollmentRequest) => new Date(req.requestDate).toLocaleString() },
+    ...(isExternal ? [
+      { key: 'sourceDeptCode', header: 'From Dept', accessor: 'sourceDeptCode' },
+      { key: 'targetSchemaPrefix', header: 'To Dept', accessor: 'targetSchemaPrefix' }
+    ] : []),
     {
       key: 'status',
       header: 'Status',
@@ -145,18 +154,24 @@ const ManageEnrollments: React.FC = () => {
       ) : (
         <>
           <div className="mb-10">
-            <h3 className="text-xl font-semibold mb-2">Internal Requests</h3>
+            <h3 className="text-xl font-semibold mb-2">Internal Enrollment Requests</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              These are requests from students within your department to enroll in your modules.
+            </p>
             {internalRequests.length === 0 ? (
-              <p className="text-muted-foreground">No internal enrollment requests</p>
+              <p className="text-muted-foreground p-4 bg-slate-50 rounded-md">No internal enrollment requests</p>
             ) : (
               <TableList columns={getColumns(false)} data={internalRequests} />
             )}
           </div>
 
           <div>
-            <h3 className="text-xl font-semibold mb-2">Cross-Department (External) Requests</h3>
+            <h3 className="text-xl font-semibold mb-2">Cross-Department Enrollment Requests</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              These are requests from students in other departments to enroll in your department's global modules.
+            </p>
             {externalRequests.length === 0 ? (
-              <p className="text-muted-foreground">No external enrollment requests</p>
+              <p className="text-muted-foreground p-4 bg-slate-50 rounded-md">No cross-department enrollment requests</p>
             ) : (
               <TableList columns={getColumns(true)} data={externalRequests} />
             )}

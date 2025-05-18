@@ -226,93 +226,129 @@ export const requestEnrollment = async (req: Request, res: Response) => {
     const { local_user_id, schema_prefix, dept_id } = mapResult.rows[0];
     const deptPool = await getDepartmentPool(schema_prefix);
     
-    // CROSS-DEPARTMENT ENROLLMENT: Handle global module enrollment request
-    if (isGlobalModule && departmentId && parseInt(departmentId) !== parseInt(dept_id)) {
-      // Verify the module exists in the global modules view
-      // The global_modules view already filters for is_global=TRUE and is_active=TRUE
-      const moduleCheckResult = await pool.query(`
-        SELECT * FROM central.global_modules
-        WHERE module_id = $1 AND dept_id = $2
-      `, [moduleId, departmentId]);
-      
-      if (!moduleCheckResult.rowCount || moduleCheckResult.rowCount === 0) {
-        return res.status(404).json({ message: 'Global module not found or is not available for cross-department enrollment' });
-      }
-      
-      const moduleDetails = moduleCheckResult.rows[0];
-      
+    // CROSS-DEPARTMENT ENROLLMENT: Handle cross-department enrollment (global module)
+    if (isGlobalModule && departmentId) {
       try {
-        // Check if this student already has a pending request for this module
+        // Get complete module details from the global_modules view
+        // The global_modules view already includes department_name and department_code
+        // But we need to join with departments to get the schema_prefix
+        const moduleCheckResult = await pool.query(`
+          SELECT gm.*, d.schema_prefix
+          FROM central.global_modules gm
+          JOIN central.departments d ON gm.dept_id = d.dept_id
+          WHERE gm.module_id = $1 AND gm.dept_id = $2
+        `, [moduleId, departmentId]);
+
+        if (!moduleCheckResult.rowCount) {
+          return res.status(404).json({ message: 'Global module not found or is not available' });
+        }
+
+        const moduleDetails = moduleCheckResult.rows[0];
+        const targetSchema = moduleDetails.schema_prefix;
+        const targetDeptCode = moduleDetails.department_code;
+        const targetDeptName = moduleDetails.department_name;
+        
+        console.log('Target schema:', targetSchema);
+        console.log('Module details:', JSON.stringify(moduleDetails, null, 2));
+        
+        // Make sure we're not trying to enroll in our own department
+        if (targetDeptCode === dept_id.toString()) {
+          return res.status(400).json({ message: 'This module is from your own department. Use regular enrollment instead.' });
+        }
+
+        // Check if already requested
         const pendingCheckResult = await deptPool.query(`
           SELECT request_id 
           FROM ${schema_prefix}.external_module_requests 
           WHERE student_id = $1 AND target_module_id = $2 AND target_dept_id = $3 AND status = 'pending'
         `, [local_user_id, moduleId, departmentId]);
-        
+
         if (pendingCheckResult.rowCount && pendingCheckResult.rowCount > 0) {
           return res.status(400).json({ message: 'You already have a pending request for this module' });
         }
-        
-        // Check if student is already enrolled in a module with the same ID in their own department
-        // This is important because module IDs can be the same across different departments
+
+        // Check if enrolled in same module ID locally
         const enrollmentCheckResult = await deptPool.query(`
           SELECT e.enrollment_id 
           FROM ${schema_prefix}.enrollments e
           JOIN ${schema_prefix}.modules m ON e.module_id = m.module_id
           WHERE e.student_id = $1 AND m.module_id = $2
         `, [local_user_id, moduleId]);
-        
+
         if (enrollmentCheckResult.rowCount && enrollmentCheckResult.rowCount > 0) {
-          // Get the module code to provide a clearer error message
-          const localModuleResult = await deptPool.query(`
-            SELECT code, title FROM ${schema_prefix}.modules WHERE module_id = $1
-          `, [moduleId]);
-          
-          const targetModuleResult = await pool.query(`
-            SELECT code, title FROM central.global_modules WHERE module_id = $1 AND dept_id = $2
-          `, [moduleId, departmentId]);
-          
-          // TypeScript safety check for rowCount properties
-          const hasLocalModule = localModuleResult && localModuleResult.rowCount && localModuleResult.rowCount > 0;
-          const hasTargetModule = targetModuleResult && targetModuleResult.rowCount && targetModuleResult.rowCount > 0;
-          
-          if (hasLocalModule && hasTargetModule) {
-            const localModule = localModuleResult.rows[0];
-            const targetModule = targetModuleResult.rows[0];
-            
-            return res.status(400).json({ 
-              message: `You are already enrolled in ${localModule.code} (${localModule.title}) which has the same internal ID as ${targetModule.code} (${targetModule.title}). Please contact an administrator for assistance.`
-            });
-          } else {
-            return res.status(400).json({ 
-              message: `You are already enrolled in a module with the same internal ID. This appears to be a system conflict. Please contact an administrator.`
-            });
-          }
+          return res.status(400).json({ message: 'You are already enrolled in a module with this ID locally' });
         }
-        
-        // Submit the external module request to student's home department schema
-        const externalRequestResult = await deptPool.query(`
-          INSERT INTO ${schema_prefix}.external_module_requests
-            (student_id, target_module_id, target_dept_id, reason, request_date, status)
-          VALUES
-            ($1, $2, $3, $4, NOW(), 'pending')
-          RETURNING request_id
-        `, [local_user_id, moduleId, departmentId, reason]);
-        
-        if (externalRequestResult.rowCount && externalRequestResult.rows.length > 0) {
-          return res.status(201).json({
-            message: `Your request to enroll in ${moduleDetails.title} (${moduleDetails.code}) from the ${moduleDetails.department_name} department has been submitted successfully.`,
-            requestId: externalRequestResult.rows[0].request_id,
-            isGlobalModule: true,
-            departmentCode: moduleDetails.department_code,
-            moduleCode: moduleDetails.code // Include module code in response
+
+        // Create a connection to the target department's database using the schema prefix
+        try {
+          const targetDeptPool = await getDepartmentPool(targetSchema);
+          
+          // Insert external request into the target department's schema
+          // Note: The table might already be in the correct schema context
+          // Try with explicit schema prefix first
+          try {
+            console.log(`Attempting to insert into ${targetSchema}.external_module_requests`);
+            const externalRequestResult = await targetDeptPool.query(`
+              INSERT INTO ${targetSchema}.external_module_requests
+                (student_id, target_module_id, target_dept_id, reason)
+              VALUES ($1, $2, $3, $4)
+              RETURNING request_id
+            `, [local_user_id, moduleId, departmentId, reason]);
+            
+            if (externalRequestResult.rowCount && externalRequestResult.rowCount > 0) {
+              return res.status(201).json({
+                message: `Your request to enroll in ${moduleDetails.title} (${moduleDetails.code}) from the ${targetDeptName} department has been submitted successfully.`,
+                requestId: externalRequestResult.rows[0].request_id,
+                isGlobalModule: true,
+                departmentCode: targetDeptCode,
+                moduleCode: moduleDetails.code,
+                compositeId: `${targetDeptCode}:${moduleDetails.code}`
+              });
+            } else {
+              throw new Error('Insert failed - no rows returned');
+            }
+          } catch (schemaError) {
+            console.error('Error with schema-prefixed query:', schemaError);
+            
+            // If that fails, try without schema prefix (in case the connection is already schema-aware)
+            try {
+              console.log('Attempting to insert without schema prefix');
+              const fallbackResult = await targetDeptPool.query(`
+                INSERT INTO external_module_requests
+                  (student_id, target_module_id, target_dept_id, reason)
+                VALUES ($1, $2, $3, $4)
+                RETURNING request_id
+              `, [local_user_id, moduleId, departmentId, reason]);
+              
+              if (fallbackResult.rowCount && fallbackResult.rowCount > 0) {
+                return res.status(201).json({
+                  message: `Your request to enroll in ${moduleDetails.title} (${moduleDetails.code}) from the ${targetDeptName} department has been submitted successfully.`,
+                  requestId: fallbackResult.rows[0].request_id,
+                  isGlobalModule: true,
+                  departmentCode: targetDeptCode,
+                  moduleCode: moduleDetails.code,
+                  compositeId: `${targetDeptCode}:${moduleDetails.code}`
+                });
+              } else {
+                throw new Error('Fallback insert failed - no rows returned');
+              }
+            } catch (error) {
+              console.error('Error with fallback query:', error);
+              throw new Error(`Failed to insert request: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+        } catch (dbError) {
+          console.error('Database connection or query error:', dbError);
+          return res.status(500).json({ 
+            message: 'Unable to connect to the target department database', 
+            error: dbError instanceof Error ? dbError.message : 'Unknown database error',
+            details: 'The module exists but the system cannot connect to the target department database.'
           });
-        } else {
-          throw new Error('Failed to insert external module request');
         }
       } catch (error) {
-        console.error('Error processing cross-department enrollment request:', error);
-        return res.status(500).json({ message: 'An error occurred while processing your cross-department enrollment request' });
+        console.error('Cross-department enrollment error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return res.status(500).json({ message: 'Enrollment failed', error: errorMessage });
       }
     }
     

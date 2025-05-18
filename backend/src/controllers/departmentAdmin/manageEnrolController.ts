@@ -43,24 +43,31 @@ export const getDepartmentEnrollmentRequests = async (req: Request, res: Respons
       ORDER BY er.request_date DESC
     `);
 
-    const external = await pool.query(`
+    // Get cross-department (external) requests from our department's schema
+    // These are requests from students in other departments to enroll in our modules
+    const external = await deptPool.query(`
       SELECT 
         er.request_id::text AS id,
         u.email AS studentEmail,
-        gm.code AS moduleCode,
-        gm.title AS moduleTitle,
+        m.code AS moduleCode,
+        m.title AS moduleTitle,
         er.reason,
         er.request_date AS requestDate,
         er.status,
         'external' AS type,
-        gm.department_code AS departmentCode
-      FROM central.external_module_requests er
+        sd.code AS sourceDeptCode,
+        sd.name AS sourceDeptName,
+        '${schema_prefix}' AS targetSchemaPrefix,
+        CONCAT(sd.code, ':', er.student_id) AS compositeStudentId,
+        CONCAT('${schema_prefix}', ':', m.code) AS compositeModuleId
+      FROM ${schema_prefix}.external_module_requests er
+      JOIN ${schema_prefix}.modules m ON er.target_module_id = m.module_id
       JOIN central.user_id_map uim ON er.student_id = uim.local_user_id
-      JOIN central.users u ON u.user_id = uim.user_id
-      JOIN central.global_modules gm ON gm.module_id = er.target_module_id AND gm.dept_id = $1
-      WHERE er.target_dept_id = $1 AND er.status = 'pending'
+      JOIN central.users u ON uim.user_id = u.user_id
+      JOIN central.departments sd ON uim.dept_id = sd.dept_id
+      WHERE er.status = 'pending'
       ORDER BY er.request_date DESC
-    `, [dept_id]);
+    `);
 
     return res.status(200).json({
       internalRequests: internal.rows,
@@ -113,31 +120,70 @@ export const reviewEnrollmentRequest = async (req: Request, res: Response) => {
         `, [student_id, module_id]);
       }
     } else if (type === 'external') {
-      const request = await pool.query(`SELECT * FROM central.external_module_requests WHERE request_id = $1`, [id]);
+      // For external requests, we need to check in our department schema
+      const request = await deptPool.query(`SELECT * FROM ${schema_prefix}.external_module_requests WHERE request_id = $1`, [id]);
       if (!request.rowCount) return res.status(404).json({ message: 'External request not found' });
 
       const { student_id, target_module_id, target_dept_id } = request.rows[0];
+      
+      // Log request details for debugging
+      console.log('Processing external request:', {
+        request_id: id,
+        student_id,
+        target_module_id,
+        target_dept_id,
+        schema_prefix
+      });
 
-      await pool.query(`
-        UPDATE central.external_module_requests
+      // Update the request in our schema
+      await deptPool.query(`
+        UPDATE ${schema_prefix}.external_module_requests
         SET status = $1, response_date = NOW(), response_notes = $2
         WHERE request_id = $3
       `, [action, notes || '', id]);
 
       if (action === 'approve') {
+        // Get module details to include in the enrollment record
+        const moduleDetails = await pool.query(`
+          SELECT gm.*, d.schema_prefix 
+          FROM central.global_modules gm
+          JOIN central.departments d ON gm.dept_id = d.dept_id
+          WHERE gm.module_id = $1 AND gm.dept_id = $2
+        `, [target_module_id, target_dept_id]);
+        
+        if (!moduleDetails.rowCount) {
+          throw new Error('Module details not found');
+        }
+
+        const moduleInfo = moduleDetails.rows[0];
+        
+        // Find the student's department and schema
         const studentMap = await pool.query(`
-          SELECT schema_prefix FROM central.departments d
-          JOIN central.user_id_map uim ON uim.dept_id = d.dept_id
+          SELECT uim.*, d.schema_prefix, d.code as dept_code 
+          FROM central.user_id_map uim
+          JOIN central.departments d ON uim.dept_id = d.dept_id
           WHERE uim.local_user_id = $1
         `, [student_id]);
 
         if (!studentMap.rowCount) throw new Error('Could not determine student schema');
 
-        const studentDeptPool = await getDepartmentPool(studentMap.rows[0].schema_prefix);
+        const studentInfo = studentMap.rows[0];
+        const studentDeptPool = await getDepartmentPool(studentInfo.schema_prefix);
+        
+        // Insert enrollment in student's department schema with reference to the global module
         await studentDeptPool.query(`
-          INSERT INTO ${studentMap.rows[0].schema_prefix}.enrollments (student_id, module_id, status, request_date)
-          VALUES ($1, $2, 'registered', NOW())
-        `, [student_id, target_module_id]);
+          INSERT INTO ${studentInfo.schema_prefix}.enrollments 
+            (student_id, module_id, status, request_date, is_external_module, 
+             external_module_code, external_dept_code, external_module_title)
+          VALUES ($1, $2, 'registered', NOW(), TRUE, $3, $4, $5)
+        `, [student_id, target_module_id, moduleInfo.code, moduleInfo.department_code, moduleInfo.title]);
+        
+        console.log(`Enrolled student ${student_id} (${studentInfo.dept_code}) in external module ${target_module_id} (${moduleInfo.department_code}:${moduleInfo.code})`);
+        
+        // Also notify the student via central database or messaging system
+        // This is a placeholder for future notification system
+        console.log('Student enrollment notification would be sent here');
+        
       }
     }
 
