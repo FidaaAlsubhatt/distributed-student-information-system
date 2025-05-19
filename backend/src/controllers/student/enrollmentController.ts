@@ -225,6 +225,19 @@ export const requestEnrollment = async (req: Request, res: Response) => {
     
     const { local_user_id, schema_prefix, dept_id } = mapResult.rows[0];
     const deptPool = await getDepartmentPool(schema_prefix);
+
+    // Get department name to generate deptCode
+const deptResult = await pool.query(
+  `SELECT name FROM central.departments WHERE dept_id = $1`,
+  [dept_id]
+);
+
+if (!deptResult.rowCount) {
+  return res.status(404).json({ message: 'Department not found' });
+}
+
+const deptName = deptResult.rows[0].name;
+const deptCode = deptName.substring(0, 5).toLowerCase();
     
     // CROSS-DEPARTMENT ENROLLMENT: Handle cross-department enrollment (global module)
     if (isGlobalModule && departmentId) {
@@ -232,6 +245,7 @@ export const requestEnrollment = async (req: Request, res: Response) => {
         // Get complete module details from the global_modules view
         // The global_modules view already includes department_name and department_code
         // But we need to join with departments to get the schema_prefix
+        
         const moduleCheckResult = await pool.query(`
           SELECT gm.*, d.schema_prefix
           FROM central.global_modules gm
@@ -256,14 +270,14 @@ export const requestEnrollment = async (req: Request, res: Response) => {
           return res.status(400).json({ message: 'This module is from your own department. Use regular enrollment instead.' });
         }
 
-        // Check if already requested
-        const pendingCheckResult = await deptPool.query(`
-          SELECT request_id 
-          FROM ${schema_prefix}.external_module_requests 
-          WHERE student_id = $1 AND target_module_id = $2 AND target_dept_id = $3 AND status = 'pending'
-        `, [local_user_id, moduleId, departmentId]);
+        // First check if the student already has a pending request for this module
+        const checkRequest = await deptPool.query(
+          `SELECT request_id FROM ${schema_prefix}.external_module_requests 
+          WHERE student_id = $1 AND target_module_id = $2 AND status = 'pending'`,
+          [local_user_id, moduleId]
+        );
 
-        if (pendingCheckResult.rowCount && pendingCheckResult.rowCount > 0) {
+        if (checkRequest.rowCount && checkRequest.rowCount > 0) {
           return res.status(400).json({ message: 'You already have a pending request for this module' });
         }
 
@@ -282,6 +296,20 @@ export const requestEnrollment = async (req: Request, res: Response) => {
         // Create a connection to the target department's database using the schema prefix
         try {
           const targetDeptPool = await getDepartmentPool(targetSchema);
+
+          // Get the student's profile (name and email) from their home department
+const studentProfileResult = await deptPool.query(`
+  SELECT s.user_id, s.university_email, p.first_name, p.last_name
+  FROM ${schema_prefix}.students s
+  JOIN ${schema_prefix}.user_profiles p ON s.user_id = p.user_id
+  WHERE s.user_id = $1
+`, [local_user_id]);
+
+if (!studentProfileResult.rowCount) {
+  return res.status(400).json({ message: 'Student profile not found' });
+}
+
+const student = studentProfileResult.rows[0];
           
           // Insert external request into the target department's schema
           // Note: The table might already be in the correct schema context
@@ -290,10 +318,21 @@ export const requestEnrollment = async (req: Request, res: Response) => {
             console.log(`Attempting to insert into ${targetSchema}.external_module_requests`);
             const externalRequestResult = await targetDeptPool.query(`
               INSERT INTO ${targetSchema}.external_module_requests
-                (student_id, target_module_id, target_dept_id, reason)
-              VALUES ($1, $2, $3, $4)
+                 (student_id, university_email, first_name, last_name, source_dept_id, source_dept_code, source_schema_prefix, 
+                 target_module_id, reason)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
               RETURNING request_id
-            `, [local_user_id, moduleId, departmentId, reason]);
+            `, [
+              local_user_id,
+              student.university_email,
+              student.first_name,
+              student.last_name,
+              dept_id,
+              deptCode,
+              schema_prefix,
+              moduleId,
+              reason
+            ]);
             
             if (externalRequestResult.rowCount && externalRequestResult.rowCount > 0) {
               return res.status(201).json({
@@ -315,10 +354,10 @@ export const requestEnrollment = async (req: Request, res: Response) => {
               console.log('Attempting to insert without schema prefix');
               const fallbackResult = await targetDeptPool.query(`
                 INSERT INTO external_module_requests
-                  (student_id, target_module_id, target_dept_id, reason)
-                VALUES ($1, $2, $3, $4)
+                  (student_id, target_module_id, reason)
+                VALUES ($1, $2, $3)
                 RETURNING request_id
-              `, [local_user_id, moduleId, departmentId, reason]);
+              `, [local_user_id, moduleId, reason]);
               
               if (fallbackResult.rowCount && fallbackResult.rowCount > 0) {
                 return res.status(201).json({
@@ -452,6 +491,7 @@ export const getEnrollmentRequests = async (req: Request, res: Response) => {
     const { local_user_id, schema_prefix, dept_id } = mapResult.rows[0];
     const deptPool = await getDepartmentPool(schema_prefix);
     
+    
     // STEP 1: Get all local enrollment requests for this student
     const localRequestsResult = await deptPool.query(`
       SELECT 
@@ -477,7 +517,7 @@ export const getEnrollmentRequests = async (req: Request, res: Response) => {
       SELECT 
         er.request_id::text as id,
         er.target_module_id::text as moduleId,
-        er.target_dept_id as departmentId,
+        er.source_dept_id as sourceDepartmentId,
         er.reason,
         er.request_date as requestDate,
         er.status,

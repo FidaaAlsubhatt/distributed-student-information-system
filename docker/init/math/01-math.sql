@@ -234,3 +234,50 @@ CREATE TABLE payments (
   reference_no VARCHAR(100),
   received_by VARCHAR(255)
 );
+
+
+CREATE TABLE math_schema.student_shadow (
+  student_id INTEGER PRIMARY KEY,  
+  university_email TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  source_dept_id INTEGER NOT NULL,
+  source_dept_code TEXT NOT NULL,
+  source_schema_prefix TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS math_schema.external_module_requests (
+  request_id SERIAL PRIMARY KEY,
+  student_id INT NOT NULL,
+  university_email TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  source_dept_id INT NOT NULL,
+  source_dept_code TEXT NOT NULL,
+  source_schema_prefix TEXT NOT NULL,
+  target_module_id INT NOT NULL,
+  reason TEXT,
+  request_date TIMESTAMP DEFAULT NOW(),
+  status VARCHAR(20) DEFAULT 'pending',
+  response_date TIMESTAMP,
+  response_notes TEXT
+);
+
+CREATE TABLE math_schema.external_enrollments (
+  id SERIAL PRIMARY KEY,
+  student_id INT NOT NULL,  -- student from another department (from shadow table)
+  module_id INT NOT NULL,   -- module in this department
+  status VARCHAR(20) DEFAULT 'registered',
+  request_date TIMESTAMP DEFAULT NOW(),
+  
+  -- Renamed to reflect local module
+  module_code TEXT,
+  module_title TEXT,
+  
+  -- Student's original department info
+  student_dept_code TEXT,
+  student_schema_prefix TEXT,
+
+  is_active BOOLEAN DEFAULT TRUE
+);

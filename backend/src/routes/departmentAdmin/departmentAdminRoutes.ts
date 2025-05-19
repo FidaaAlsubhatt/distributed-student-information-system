@@ -5,6 +5,8 @@ import * as userController from '../../controllers/departmentAdmin/userControlle
 import * as programController from '../../controllers/departmentAdmin/programController';
 import * as staffController from '../../controllers/departmentAdmin/manageStaffController';
 import * as studentController from '../../controllers/departmentAdmin/manageStudentController';
+import * as enrollmentController from '../../controllers/departmentAdmin/manageEnrolController';
+
 const router = Router();
 
 // Apply authentication middleware to all routes
@@ -90,12 +92,6 @@ router.delete('/programs/:programId/students/:studentId', studentController.remo
 // -----------------------------
 // Enrollment Management Routes
 // -----------------------------
-import * as enrollmentController from '../../controllers/departmentAdmin/manageEnrolController';
-
-// Test route to check if the router is working
-router.get('/test', (req, res) => {
-  res.status(200).json({ message: 'Department admin router is working!' });
-});
 
 // Unified endpoint for internal and external requests
 router.get('/enrollment-requests', enrollmentController.getDepartmentEnrollmentRequests);

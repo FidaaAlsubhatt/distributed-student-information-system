@@ -130,7 +130,7 @@ CREATE TABLE assignments (
   module_id INT REFERENCES modules(module_id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
-  due_date DATE NOT NULL
+  due_date DATE NOT NULL,
   instructions TEXT,
   total_marks INT NOT NULL DEFAULT 100,
   weight NUMERIC(5,2) NOT NULL DEFAULT 1.0,
@@ -142,7 +142,7 @@ CREATE TABLE submissions (
   assignment_id INT REFERENCES assignments(assignment_id) ON DELETE CASCADE,
   student_id INT REFERENCES students(user_id) ON DELETE CASCADE,
   file_path TEXT,
-  submitted_at TIMESTAMP DEFAULT NOW(),
+  submitted_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE assignment_grades (
@@ -252,4 +252,52 @@ CREATE TABLE module_staff (
   staff_id INT REFERENCES staff(user_id) ON DELETE CASCADE,
   role VARCHAR(50) DEFAULT 'lecturer', -- UK terminology: 'lecturer', 'teaching assistant', etc.
   UNIQUE(module_id, staff_id)
+);
+
+
+CREATE TABLE cs_schema.student_shadow (
+  student_id INTEGER PRIMARY KEY,  -- local to the target schema (NOT same as global user_id)
+  university_email TEXT NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  source_dept_id INTEGER NOT NULL,
+  source_dept_code TEXT NOT NULL,
+  source_schema_prefix TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS cs_schema.external_module_requests (
+  request_id SERIAL PRIMARY KEY,
+  student_id INT NOT NULL, -- local_user_id from the sender dept
+  university_email TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  source_dept_id INT NOT NULL,
+  source_dept_code TEXT NOT NULL,
+  source_schema_prefix TEXT NOT NULL,
+  target_module_id INT NOT NULL,
+  reason TEXT,
+  request_date TIMESTAMP DEFAULT NOW(),
+  status VARCHAR(20) DEFAULT 'pending',
+  response_date TIMESTAMP,
+  response_notes TEXT
+);
+
+
+CREATE TABLE cs_schema.external_enrollments (
+  id SERIAL PRIMARY KEY,
+  student_id INT NOT NULL,  -- student from another department (from shadow table)
+  module_id INT NOT NULL,   -- module in this department
+  status VARCHAR(20) DEFAULT 'registered',
+  request_date TIMESTAMP DEFAULT NOW(),
+  
+  -- Renamed to reflect local module
+  module_code TEXT,
+  module_title TEXT,
+  
+  -- Student's original department info
+  student_dept_code TEXT,
+  student_schema_prefix TEXT,
+
+  is_active BOOLEAN DEFAULT TRUE
 );
