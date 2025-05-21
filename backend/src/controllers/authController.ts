@@ -55,31 +55,6 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Account is not active' });
     }
 
-    // Special handling for the template accounts during development
-    // Use case-insensitive comparison for template accounts
-    const templateAccounts = ['math.admin@university.ac.uk', 
-                            'cs.admin@university.ac.uk', 'central.admin@university.ac.uk'];
-    const isTemplateAccount = templateAccounts.some(template => 
-      template.toLowerCase() === email.toLowerCase());
-    
-    console.log(`Checking password for ${email}, hash: ${user.password_hash.substring(0, 20)}...`);
-    console.log(`Is template account: ${isTemplateAccount}`);
-    
-    // For template accounts, accept 'password123' directly (during development)
-    let isPasswordValid = false;
-    
-    if (isTemplateAccount && password === 'password123') {
-      console.log('Using hardcoded password comparison for template account');
-      isPasswordValid = true;
-    } else {
-      isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    }
-    
-    console.log(`Password valid: ${isPasswordValid}`);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
     
     // Step 1: Get user's roles and department roles
     const rolesResult = await pool.query(
