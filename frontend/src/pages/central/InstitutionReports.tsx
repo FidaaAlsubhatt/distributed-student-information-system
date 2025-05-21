@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TableList from '@/components/dashboard/TableList';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartBarIcon, AcademicCapIcon, BuildingLibraryIcon, UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 type Student = {
   global_user_id: string;
@@ -56,12 +58,41 @@ type Exam = {
   department_code: string;
 };
 
+// Dashboard stat card component
+const StatCard: React.FC<{
+  title: string;
+  value: string | number;
+  description?: string;
+  icon: React.ReactNode;
+}> = ({ title, value, description, icon }) => {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between space-x-4">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <h3 className="text-2xl font-bold mt-1">{value}</h3>
+            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+          </div>
+          <div className="p-2 rounded-full bg-primary/10">
+            <div className="w-8 h-8 text-primary">{icon}</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
 const InstitutionReports: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
+  const [activeTab, setActiveTab] = useState('students');
+  const [loading, setLoading] = useState(true);
 
   // Fetch all five in parallel from centralized FDW views
   useEffect(() => {
@@ -90,6 +121,7 @@ const InstitutionReports: React.FC = () => {
     
     // Fetch data from centralized views using FDW
     const fetchAllData = async () => {
+      setLoading(true);
       try {
         const [studentData, enrollmentData, gradeData, staffData, examData] = await Promise.all([
           fetchWithAuth('student_directory'),
@@ -106,6 +138,8 @@ const InstitutionReports: React.FC = () => {
         setExams(examData || []);
       } catch (error) {
         console.error('Error fetching central data:', error);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -164,75 +198,336 @@ const InstitutionReports: React.FC = () => {
     { key: 'department_code', header: 'Dept' },
   ];
 
+  // Calculate summary statistics from raw data
+  const calculateSummaryStats = () => {
+    // Department statistics
+    const departmentCounts = students.reduce((acc, student) => {
+      acc[student.department_code] = (acc[student.department_code] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const departmentPieData = Object.entries(departmentCounts).map(([dept, count], index) => ({
+      name: dept,
+      value: count,
+      color: COLORS[index % COLORS.length]
+    }));
+    
+    // Status statistics
+    const statusCounts = students.reduce((acc, student) => {
+      acc[student.status] = (acc[student.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const statusData = Object.entries(statusCounts).map(([status, count]) => ({
+      name: status,
+      value: count
+    }));
+    
+    // Academic year distribution
+    const yearCounts = students.reduce((acc, student) => {
+      const year = student.academic_year.toString();
+      acc[year] = (acc[year] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const yearData = Object.entries(yearCounts)
+      .map(([year, count]) => ({
+        name: `Year ${year}`,
+        students: count
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Enrollment distribution by department
+    const deptEnrollmentCounts = enrollments.reduce((acc, enrollment) => {
+      acc[enrollment.department_code] = (acc[enrollment.department_code] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const deptEnrollmentData = Object.entries(deptEnrollmentCounts).map(([dept, count]) => ({
+      name: dept,
+      enrollments: count
+    }));
+    
+    // Grade distribution
+    const gradeDistribution = grades.reduce((acc, grade) => {
+      // Assuming UK grading system with First, 2:1, 2:2, Third, Pass, Fail
+      let category = 'Other';
+      
+      // Assuming grades are stored as A, B, C, D, etc.
+      if (grade.grade === 'A' || grade.grade === 'A+') category = 'First';
+      else if (grade.grade === 'B' || grade.grade === 'B+') category = '2:1';
+      else if (grade.grade === 'C' || grade.grade === 'C+') category = '2:2';
+      else if (grade.grade === 'D' || grade.grade === 'D+') category = 'Third';
+      else if (grade.grade === 'E') category = 'Pass';
+      else if (grade.grade === 'F') category = 'Fail';
+      
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const gradeData = Object.entries(gradeDistribution).map(([grade, count]) => ({
+      name: grade,
+      students: count
+    }));
+    
+    return {
+      departmentPieData,
+      statusData,
+      yearData,
+      deptEnrollmentData,
+      gradeData,
+      totalStudents: students.length,
+      totalStaff: staff.length,
+      totalEnrollments: enrollments.length,
+      totalModules: [...new Set(enrollments.map(e => e.module_id))].length,
+      totalExams: exams.length
+    };
+  };
+  
+  const summaryStats = students.length > 0 ? calculateSummaryStats() : null;
+  
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+  
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold">Institution Reports</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Institution Reports</h2>
+          <p className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            })}
+          </p>
+        </div>
+        
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading institution data...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Summary Statistics */}
+            {summaryStats && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <StatCard 
+                  title="Total Students" 
+                  value={summaryStats.totalStudents} 
+                  description="Enrolled across all departments"
+                  icon={<AcademicCapIcon />} 
+                />
+                <StatCard 
+                  title="Academic Staff" 
+                  value={summaryStats.totalStaff} 
+                  description="Faculty and researchers"
+                  icon={<UserGroupIcon />} 
+                />
+                <StatCard 
+                  title="Active Modules" 
+                  value={summaryStats.totalModules} 
+                  description="Currently being taught"
+                  icon={<ChartBarIcon />} 
+                />
+                <StatCard 
+                  title="Total Enrollments" 
+                  value={summaryStats.totalEnrollments} 
+                  description="Module registrations"
+                  icon={<CheckCircleIcon />} 
+                />
+                <StatCard 
+                  title="Scheduled Exams" 
+                  value={summaryStats.totalExams} 
+                  description="Upcoming assessments"
+                  icon={<BuildingLibraryIcon />} 
+                />
+              </div>
+            )}
 
-        <Tabs defaultValue="students">
-          <TabsList>
-            <TabsTrigger value="students">Students</TabsTrigger>
-            <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
-            <TabsTrigger value="grades">Grades</TabsTrigger>
-            <TabsTrigger value="staff">Staff</TabsTrigger>
-            <TabsTrigger value="exams">Exams</TabsTrigger>
-          </TabsList>
+            <Tabs defaultValue="students" onValueChange={handleTabChange}>
+              <TabsList>
+                <TabsTrigger value="students">Students</TabsTrigger>
+                <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
+                <TabsTrigger value="grades">Grades</TabsTrigger>
+                <TabsTrigger value="staff">Staff</TabsTrigger>
+                <TabsTrigger value="exams">Exams</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="students">
-            <Card>
-              <CardHeader>
-                <CardTitle>Student Directory</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TableList columns={studentColumns} data={students} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="students">
+                {summaryStats && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Students by Department</CardTitle>
+                        <CardDescription>Distribution of students across academic departments</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-center">
+                        <div className="h-[300px] w-full max-w-[500px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={summaryStats.departmentPieData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={true}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                              >
+                                {summaryStats.departmentPieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => [`${value} students`, 'Count']} />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Students by Academic Year</CardTitle>
+                        <CardDescription>Distribution across year groups</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-center">
+                        <div className="h-[300px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={summaryStats.yearData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="students" fill="#8884d8" name="Students" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Student Directory</CardTitle>
+                    <CardDescription>Complete student records from all departments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableList columns={studentColumns} data={students} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="enrollments">
-            <Card>
-              <CardHeader>
-                <CardTitle>Module Enrollments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TableList columns={enrollmentColumns} data={enrollments} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="enrollments">
+                {summaryStats && (
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle>Enrollments by Department</CardTitle>
+                      <CardDescription>Module enrollment distribution</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-center">
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={summaryStats.deptEnrollmentData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="enrollments" fill="#00C49F" name="Enrollments" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Module Enrollments</CardTitle>
+                    <CardDescription>All student module registrations</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableList columns={enrollmentColumns} data={enrollments} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="grades">
-            <Card>
-              <CardHeader>
-                <CardTitle>Grades Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TableList columns={gradeColumns} data={grades} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="grades">
+                {summaryStats && (
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle>Grade Distribution</CardTitle>
+                      <CardDescription>Performance across all departments</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-center">
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={summaryStats.gradeData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="students" fill="#FFBB28" name="Students" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Grades Overview</CardTitle>
+                    <CardDescription>Student academic performance records</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableList columns={gradeColumns} data={grades} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="staff">
-            <Card>
-              <CardHeader>
-                <CardTitle>Staff Directory</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TableList columns={staffColumns} data={staff} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="staff">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Staff Directory</CardTitle>
+                    <CardDescription>Academic and administrative personnel</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableList columns={staffColumns} data={staff} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="exams">
-            <Card>
-              <CardHeader>
-                <CardTitle>Exam Schedule</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TableList columns={examColumns} data={exams} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="exams">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Exam Schedule</CardTitle>
+                    <CardDescription>Upcoming assessments across all departments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TableList columns={examColumns} data={exams} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
