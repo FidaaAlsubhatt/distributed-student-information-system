@@ -55,7 +55,13 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Account is not active' });
     }
 
-    
+    // Standard password validation
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+     
     // Step 1: Get user's roles and department roles
     const rolesResult = await pool.query(
       `SELECT ur.user_id, ur.role_id, r.name as role_name, r.scope as role_scope 
