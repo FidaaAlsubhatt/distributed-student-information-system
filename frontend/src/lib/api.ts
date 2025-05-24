@@ -41,6 +41,7 @@ export interface StudentFormData {
   firstName: string;
   lastName: string;
   personalEmail: string;
+  personalPhone?: string;
   gender: string;
   dateOfBirth: string;
   yearOfStudy: number;
@@ -60,6 +61,12 @@ export interface StudentFormData {
   kinName: string;
   kinRelation: string;
   kinPhone: string;
+  
+  // Academic info
+  studentNumber?: string;
+  universityEmail?: string;
+  phoneNumber?: string;
+  password?: string;
   
   // Department info - used internally
   departmentId?: string;
@@ -196,7 +203,7 @@ export const api = {
 
   // Students
   addStudent: async (studentData: StudentFormData, departmentCode: string): Promise<any> => {
-    return apiRequest('POST', '/api/department/users/student', studentData, departmentCode);
+    return apiRequest('POST', '/api/department/students', studentData, departmentCode);
   },
 
   getStudents: async (departmentCode: string) => {

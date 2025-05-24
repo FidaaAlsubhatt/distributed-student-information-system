@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { pool, getDepartmentPool } from '../../db';
+import { Client } from 'pg';
 
 // Define the user type as expected from JWT token
 interface AuthUser {
@@ -10,6 +11,9 @@ interface AuthUser {
   exp?: number;
 }
 
+/**
+ * Get student modules from their home department
+ */
 export const getStudentModules = async (req: Request, res: Response) => {
   try {
     // Cast req.user to our interface
@@ -97,13 +101,114 @@ export const getStudentModules = async (req: Request, res: Response) => {
     
     console.log(`Found ${modulesResult.rows.length} modules for student in ${schema_prefix}`);
     
-    // Return modules with department information
+    // Get the moduleType query parameter (if provided)
+    const moduleType = req.query.type as string || 'home';
+    
+    // If external modules are requested, fetch them
+    if (moduleType === 'external') {
+      const externalModules = await getExternalModulesForStudent(email, local_user_id, schema_prefix);
+      return res.status(200).json({
+        modules: externalModules,
+        department: schema_prefix,
+        moduleType: 'external'
+      });
+    }
+    
+    // Return home department modules with department information
     return res.status(200).json({
       modules: modulesResult.rows,
-      department: schema_prefix
+      department: schema_prefix,
+      moduleType: 'home'
     });
   } catch (error) {
     console.error('Error fetching student modules:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+/**
+ * Helper function to get external modules a student is enrolled in across departments
+ */
+async function getExternalModulesForStudent(
+  email: string | undefined,
+  homeStudentId: number,
+  homeSchemaPrefix: string
+): Promise<any[]> {
+  // If email is undefined, return empty array
+  if (!email) {
+    console.error('Email is required to fetch external modules');
+    return [];
+  }
+  try {
+    // Find all departments where the student might have external enrollments
+    const departmentsResult = await pool.query(
+      `SELECT d.dept_id, d.schema_prefix, d.host, d.port, d.dbname
+       FROM central.departments d
+       WHERE d.schema_prefix != $1`,
+      [homeSchemaPrefix]
+    );
+    
+    if (departmentsResult.rows.length === 0) {
+      return [];
+    }
+    
+    // Array to collect all external modules
+    let allExternalModules: any[] = [];
+    
+    // Check each department for possible external enrollments
+    for (const dept of departmentsResult.rows) {
+      try {
+        // Get department-specific connection
+        const deptPool = await getDepartmentPool(dept.schema_prefix);
+        
+        // First check if the student has a shadow record in this department
+        const shadowCheckResult = await deptPool.query(
+          `SELECT student_id FROM ${dept.schema_prefix}.student_shadow
+           WHERE university_email = $1`,
+          [email]
+        );
+        
+        if (shadowCheckResult.rows.length === 0) {
+          // No shadow record, no enrollments possible
+          continue;
+        }
+        
+        const shadowStudentId = shadowCheckResult.rows[0].student_id;
+        
+        // Check for external enrollments
+        const externalEnrollmentsResult = await deptPool.query(
+          `SELECT 
+             ee.id as enrollment_id,
+             ee.module_id::text,
+             ee.module_code,
+             ee.module_title as title,
+             'External module' as description,
+             15 as credits,
+             '2024-2025' as academic_year,
+             ee.status,
+             'Not Graded' as grade,
+             'Current' as semester,
+             NULL as instructor,
+             ee.student_dept_code as source_department,
+             $1 as external_department
+           FROM ${dept.schema_prefix}.external_enrollments ee
+           WHERE ee.student_id = $2 AND ee.is_active = true`,
+          [dept.schema_prefix.replace('_schema', ''), shadowStudentId]
+        );
+        
+        if (externalEnrollmentsResult.rows.length > 0) {
+          // Add these modules to our collection
+          allExternalModules = [...allExternalModules, ...externalEnrollmentsResult.rows];
+        }
+      } catch (error) {
+        console.error(`Error checking department ${dept.schema_prefix} for external enrollments:`, error);
+        // Continue with other departments even if one fails
+      }
+    }
+    
+    return allExternalModules;
+  } catch (error) {
+    console.error('Error fetching external modules:', error);
+    return [];
+  }
+}

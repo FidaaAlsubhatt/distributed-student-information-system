@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useLocation } from 'wouter';
+import { useUser } from '@/contexts/UserContext';
 
 import {
   Dialog,
@@ -35,7 +36,7 @@ const formSchema = z.object({
     message: 'Please enter a valid date',
   }),
   gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']),
-  personalEmail: z.string().email({ message: 'Please enter a valid email address' }).optional().or(z.literal('')),
+  personalEmail: z.string().email({ message: 'Please enter a valid email address' }),
   personalPhone: z.string().optional().or(z.literal('')),
   address: z.object({
     line1: z.string().min(1, { message: 'Address line 1 is required' }),
@@ -50,6 +51,10 @@ const formSchema = z.object({
   phoneNumber: z.string().optional().or(z.literal('')),
   yearOfStudy: z.number().int().min(1).max(7),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  // Fields for emergency contact (next of kin)
+  kinName: z.string().min(1, { message: 'Emergency contact name is required' }),
+  kinRelation: z.string().min(1, { message: 'Relationship to contact is required' }),
+  kinPhone: z.string().min(1, { message: 'Emergency contact phone is required' }),
 });
 
 // Form values type
@@ -64,7 +69,12 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, navigate] = useLocation();
+  const { activeDepartment } = useUser();
+  const deptCode = activeDepartment?.departmentCode;
 
+  // Dummy programId to use (real system would fetch available programs)
+  const defaultProgramId = "prog1";
+  
   // Initialize form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -81,13 +91,16 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
         city: '',
         state: '',
         postalCode: '',
-        country: '',
+        country: 'United Kingdom',
       },
       studentNumber: '',
       universityEmail: '',
       phoneNumber: '',
       yearOfStudy: 1,
       password: '',
+      kinName: '',
+      kinRelation: '',
+      kinPhone: '',
     },
   });
 
@@ -96,27 +109,38 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
     try {
       setIsSubmitting(true);
       
+      if (!deptCode) {
+        throw new Error('Department code is missing. Please check your permissions.');
+      }
+      
       const result = await api.addStudent({
         firstName: data.firstName,
         lastName: data.lastName,
         dateOfBirth: data.dateOfBirth,
         gender: data.gender,
-        personalEmail: data.personalEmail || undefined,
+        personalEmail: data.personalEmail,
         personalPhone: data.personalPhone || undefined,
-        address: {
-          line1: data.address.line1,
-          line2: data.address.line2 || undefined,
-          city: data.address.city,
-          state: data.address.state,
-          postalCode: data.address.postalCode,
-          country: data.address.country,
-        },
+        // Required field for backend - using default program ID
+        programId: defaultProgramId,
+        nationalityId: 'nat1', // Default nationality
+        line1: data.address.line1,
+        line2: data.address.line2 || undefined,
+        city: data.address.city,
+        state: data.address.state,
+        postalCode: data.address.postalCode,
+        country: data.address.country,
+        // Next of kin fields
+        kinName: data.kinName,
+        kinRelation: data.kinRelation,
+        kinPhone: data.kinPhone,
+        // Additional student fields
         studentNumber: data.studentNumber,
         universityEmail: data.universityEmail,
         phoneNumber: data.phoneNumber || undefined,
         yearOfStudy: data.yearOfStudy,
         password: data.password,
-      });
+        role: 'student', // Explicitly set the role
+      }, deptCode);
       
       toast({
         title: 'Success',
@@ -427,6 +451,56 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Emergency Contact</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="kinName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Jane Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="kinRelation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Relationship</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Parent" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="kinPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+44 7123 456789" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+            
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Account Information</h3>
               
