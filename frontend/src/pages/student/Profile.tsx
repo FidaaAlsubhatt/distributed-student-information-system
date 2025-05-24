@@ -46,12 +46,21 @@ interface StudentAddress {
   country: string;
 }
 
+interface ProgramInfo {
+  id: string;
+  name: string;
+  level: string;
+  duration: number;
+  startDate: string;
+}
+
 interface AcademicInfo {
   studentNumber: string;
   department: string;
   year: number;
   enrollDate: string;
   status: string;
+  program: ProgramInfo | null;
 }
 
 interface EmergencyContact {
@@ -99,7 +108,8 @@ const defaultProfile: StudentProfile = {
     department: '',
     year: 1,
     enrollDate: '',
-    status: ''
+    status: '',
+    program: null
   },
   emergencyContact: {
     name: '',
@@ -361,6 +371,33 @@ const Profile: React.FC = () => {
                     <h3 className="font-medium text-sm">Status</h3>
                     <p className="text-gray-600">{profile.academicInfo?.status || 'Not available'}</p>
                   </div>
+                  
+                  {/* Program Information */}
+                  {profile.academicInfo?.program && (
+                    <div className="col-span-1 md:col-span-2 mt-4">
+                      <div className="border rounded-lg p-4 bg-gray-50">
+                        <h3 className="font-medium text-base mb-3">Program Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <h3 className="font-medium text-sm">Program Name</h3>
+                            <p className="text-gray-600">{profile.academicInfo.program.name}</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <h3 className="font-medium text-sm">Level</h3>
+                            <p className="text-gray-600">{profile.academicInfo.program.level}</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <h3 className="font-medium text-sm">Duration</h3>
+                            <p className="text-gray-600">{profile.academicInfo.program.duration} years</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <h3 className="font-medium text-sm">Start Date</h3>
+                            <p className="text-gray-600">{new Date(profile.academicInfo.program.startDate).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <h3 className="font-medium text-sm">Date of Birth</h3>
                     <p className="text-gray-600">{profile.dateOfBirth || 'Not available'}</p>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,6 +50,7 @@ const formSchema = z.object({
   universityEmail: z.string().email({ message: 'Please enter a valid email address' }),
   phoneNumber: z.string().optional().or(z.literal('')),
   yearOfStudy: z.number().int().min(1).max(7),
+  programId: z.string().min(1, { message: 'Program selection is required' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
   // Fields for emergency contact (next of kin)
   kinName: z.string().min(1, { message: 'Emergency contact name is required' }),
@@ -72,8 +73,65 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
   const { activeDepartment } = useUser();
   const deptCode = activeDepartment?.departmentCode;
 
-  // Dummy programId to use (real system would fetch available programs)
-  const defaultProgramId = "prog1";
+  // State for available programs
+  const [programs, setPrograms] = useState<{ id: string; name: string }[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(false);
+  
+  // Fetch available programs for the department
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      if (!deptCode) return;
+      
+      try {
+        setLoadingPrograms(true);
+        // The department programs endpoint uses JWT token for authentication
+        // and automatically determines the department
+        // Get auth data from localStorage - this is how your app stores tokens
+        const authJson = localStorage.getItem('auth');
+        let token = '';
+        
+        if (authJson) {
+          try {
+            const authData = JSON.parse(authJson);
+            token = authData.token || '';
+            console.log('Using token from auth data in form');
+          } catch (e) {
+            console.error('Error parsing auth data in form:', e);
+          }
+        }
+        
+        const response = await fetch('/api/department/programs', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('Form API request made with auth token present:', !!token);
+        const data = await response.json();
+        if (data?.programs) {
+          console.log('Programs fetched for form:', data.programs);
+          setPrograms(data.programs);
+        } else {
+          console.warn('Unexpected format from API:', data);
+          // Fallback to default program
+          setPrograms([{ id: 'prog1', name: 'Computer Science' }]);
+        }
+      } catch (error) {
+        console.error('Error fetching programs:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load programs. Using default settings instead.',
+          variant: 'destructive',
+        });
+        // Fallback to default program
+        setPrograms([{ id: 'prog1', name: 'Computer Science' }]);
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+    
+    fetchPrograms();
+  }, [deptCode, toast]);
   
   // Initialize form
   const form = useForm<FormValues>({
@@ -97,6 +155,7 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
       universityEmail: '',
       phoneNumber: '',
       yearOfStudy: 1,
+      programId: '',
       password: '',
       kinName: '',
       kinRelation: '',
@@ -120,8 +179,8 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
         gender: data.gender,
         personalEmail: data.personalEmail,
         personalPhone: data.personalPhone || undefined,
-        // Required field for backend - using default program ID
-        programId: defaultProgramId,
+        // Use the selected program ID
+        programId: data.programId,
         nationalityId: 'nat1', // Default nationality
         line1: data.address.line1,
         line2: data.address.line2 || undefined,
@@ -442,6 +501,43 @@ const AddStudentForm: React.FC<AddStudentFormProps> = ({ isOpen, onClose }) => {
                               Year {year}
                             </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                <FormField
+                  control={form.control}
+                  name="programId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Program</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={loadingPrograms}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={loadingPrograms ? "Loading programs..." : "Select program"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {loadingPrograms ? (
+                            <SelectItem value="loading" disabled>Loading programs...</SelectItem>
+                          ) : programs.length === 0 ? (
+                            <SelectItem value="none" disabled>No programs available</SelectItem>
+                          ) : (
+                            programs.map((program) => (
+                              <SelectItem key={program.id} value={program.id}>
+                                {program.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />

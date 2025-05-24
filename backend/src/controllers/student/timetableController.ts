@@ -67,14 +67,23 @@ export const getStudentClassTimetable = async (req: Request, res: Response) => {
     `);
     console.log('Total timetable entries:', timetableCheckResult.rows[0].count);
     
-    // Check if student is enrolled in any modules
-    const enrollmentCheckResult = await deptPool.query(`
-      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    // First check if student is enrolled in any programs
+    const programEnrollmentCheck = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.student_programs WHERE student_id = $1
     `, [local_user_id]);
-    console.log('Student enrollments:', enrollmentCheckResult.rows[0].count);
+    console.log('Student program enrollments (timetable):', programEnrollmentCheck.rows[0].count);
     
-    // Get timetable for all enrolled modules (with more permissive query for debugging)
+    // Simplified timetable query that focuses on getting module timetables for a student's program
     const timetableResult = await deptPool.query(`
+      -- First get all modules the student is enrolled in through their program
+      WITH student_modules AS (
+        SELECT DISTINCT m.module_id
+        FROM ${schema_prefix}.student_programs sp
+        JOIN ${schema_prefix}.program_modules pm ON sp.program_id = pm.program_id
+        JOIN ${schema_prefix}.modules m ON pm.module_id = m.module_id
+        WHERE sp.student_id = $1
+      )
+      -- Then get all timetable entries for those modules
       SELECT 
         t.timetable_id as id,
         CASE 
@@ -94,17 +103,23 @@ export const getStudentClassTimetable = async (req: Request, res: Response) => {
         m.module_id as moduleId,
         m.code as moduleCode,
         m.title as moduleName,
-        COALESCE(s.title || ' ' || up.first_name || ' ' || up.last_name, 'TBD') as lecturer,
+        'TBD' as lecturer,
         'class' as type
-      FROM ${schema_prefix}.enrollments e
-      JOIN ${schema_prefix}.modules m ON e.module_id = m.module_id
-      JOIN ${schema_prefix}.timetables t ON m.module_id = t.module_id
+      FROM ${schema_prefix}.timetables t
+      JOIN student_modules sm ON t.module_id = sm.module_id
+      JOIN ${schema_prefix}.modules m ON t.module_id = m.module_id
       LEFT JOIN ${schema_prefix}.locations l ON t.location_id = l.location_id
-      LEFT JOIN ${schema_prefix}.staff s ON s.user_id = (SELECT MIN(user_id) FROM ${schema_prefix}.staff)
-      LEFT JOIN ${schema_prefix}.user_profiles up ON s.user_id = up.user_id
-      WHERE e.student_id = $1
       ORDER BY t.event_date
     `, [local_user_id]);
+
+    // Print the actual row count for debugging
+    console.log(`Found ${timetableResult.rowCount} timetable entries for student ${local_user_id} in program`);
+    
+    // Also check for any direct module enrollments (for backward compatibility)
+    const directEnrollmentsResult = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Direct module enrollments (timetable):', directEnrollmentsResult.rows[0].count);
     
     console.log('Timetable query returned rows:', timetableResult.rowCount);
     
@@ -186,14 +201,29 @@ export const getStudentExamTimetable = async (req: Request, res: Response) => {
       return res.status(503).json({ message: `${schema_prefix} database unavailable` });
     }
     
+    // First check if student is enrolled in any programs
+    const programEnrollmentCheck = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.student_programs WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Student program enrollments (exams):', programEnrollmentCheck.rows[0].count);
+    
     // First check if we have any exam entries (for debugging)
     const examCheckResult = await deptPool.query(`
       SELECT COUNT(*) as count FROM ${schema_prefix}.exams
     `);
     console.log('Total exam entries:', examCheckResult.rows[0].count);
 
-    // Get exam timetable for enrolled modules - UK format for dates
+    // Simplified exam query that focuses on getting exams for a student's program modules
     const examResult = await deptPool.query(`
+      -- First get all modules the student is enrolled in through their program
+      WITH student_modules AS (
+        SELECT DISTINCT m.module_id
+        FROM ${schema_prefix}.student_programs sp
+        JOIN ${schema_prefix}.program_modules pm ON sp.program_id = pm.program_id
+        JOIN ${schema_prefix}.modules m ON pm.module_id = m.module_id
+        WHERE sp.student_id = $1
+      )
+      -- Then get all exam entries for those modules
       SELECT 
         e.exam_id as id,
         TO_CHAR(e.exam_date, 'DD/MM/YYYY') as date,
@@ -216,13 +246,21 @@ export const getStudentExamTimetable = async (req: Request, res: Response) => {
         m.code as moduleCode,
         m.title as moduleName,
         'exam' as type
-      FROM ${schema_prefix}.enrollments en
-      JOIN ${schema_prefix}.modules m ON en.module_id = m.module_id
-      JOIN ${schema_prefix}.exams e ON m.module_id = e.module_id
-      JOIN ${schema_prefix}.locations l ON e.location_id = l.location_id
-      WHERE en.student_id = $1
+      FROM ${schema_prefix}.exams e
+      JOIN student_modules sm ON e.module_id = sm.module_id
+      JOIN ${schema_prefix}.modules m ON e.module_id = m.module_id
+      LEFT JOIN ${schema_prefix}.locations l ON e.location_id = l.location_id
       ORDER BY e.exam_date
     `, [local_user_id]);
+    
+    // Print the actual row count for debugging
+    console.log(`Found ${examResult.rowCount} exam entries for student ${local_user_id} in program`);
+    
+    // Also check for any direct module enrollments (for backward compatibility)
+    const directEnrollmentsResult = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Direct module enrollments (exams):', directEnrollmentsResult.rows[0].count);
     
     // Debug the raw exam data from database
     console.log('Raw exam data from database:', examResult.rows[0]);

@@ -49,7 +49,7 @@ export const getStudentProfile = async (req: Request, res: Response) => {
     const { local_user_id, schema_prefix, department_name } = mapResult.rows[0];
     const deptPool = await getDepartmentPool(schema_prefix);
     
-    // Get complete student profile with UK terminology
+    // Get complete student profile with UK terminology, including program information
     const profileResult = await deptPool.query(`
       SELECT 
         s.user_id,
@@ -73,14 +73,26 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         n.name as nationality,
         nok.name as next_of_kin_name,
         nok.relation as next_of_kin_relation,
-        nok.contact_number as next_of_kin_phone
+        nok.contact_number as next_of_kin_phone,
+        -- Add program information
+        p.program_id,
+        p.name as program_name,
+        p.level as program_level,
+        p.duration as program_duration,
+        sp.start_date as program_start_date
       FROM ${schema_prefix}.students s
       JOIN ${schema_prefix}.user_profiles up ON s.user_id = up.user_id
       LEFT JOIN ${schema_prefix}.addresses a ON up.address_id = a.id
       LEFT JOIN ${schema_prefix}.nationalities n ON up.nationality_id = n.nationality_id
       LEFT JOIN ${schema_prefix}.next_of_kin nok ON s.user_id = nok.student_id
+      -- Join to get program information
+      LEFT JOIN ${schema_prefix}.student_programs sp ON s.user_id = sp.student_id
+      LEFT JOIN ${schema_prefix}.programs p ON sp.program_id = p.program_id
       WHERE s.user_id = $1
     `, [local_user_id]);
+    
+    // Check if we found program info
+    console.log('Student program info:', profileResult.rows[0]?.program_name || 'None');
     
     if (!profileResult.rowCount) {
       return res.status(404).json({ message: 'Student profile not found' });
@@ -112,6 +124,14 @@ export const getStudentProfile = async (req: Request, res: Response) => {
         year: studentData.year,
         enrollDate: studentData.enroll_date,
         status: studentData.status,
+        // Add program information
+        program: studentData.program_name ? {
+          id: studentData.program_id,
+          name: studentData.program_name,
+          level: studentData.program_level,
+          duration: studentData.program_duration,
+          startDate: studentData.program_start_date
+        } : null
       },
       emergencyContact: {
         name: studentData.next_of_kin_name || '',

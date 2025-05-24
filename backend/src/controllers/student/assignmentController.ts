@@ -49,7 +49,13 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
     const { local_user_id, schema_prefix } = mapResult.rows[0];
     const deptPool = await getDepartmentPool(schema_prefix);
     
-    // Get assignments with UK terminology
+    // First, check if student is enrolled in any programs
+    const programEnrollmentCheck = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.student_programs WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Student program enrollments (assignments):', programEnrollmentCheck.rows[0].count);
+    
+    // Get assignments for modules linked to the student's program(s)
     const assignmentsResult = await deptPool.query(`
       SELECT 
         a.assignment_id::text as id,
@@ -73,8 +79,8 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
                 WHERE sub.assignment_id = a.assignment_id AND ag_inner.grade IS NOT NULL
               ) = (
                 SELECT COUNT(*) 
-                FROM ${schema_prefix}.enrollments 
-                WHERE module_id = m.module_id
+                FROM ${schema_prefix}.student_programs 
+                WHERE student_id = $1
               ) THEN 'fully_graded'
               ELSE 'partially_graded'
             END
@@ -98,11 +104,22 @@ export const getStudentAssignments = async (req: Request, res: Response) => {
         ag.graded_at as gradedat
       FROM ${schema_prefix}.assignments a
       JOIN ${schema_prefix}.modules m ON a.module_id = m.module_id
-      JOIN ${schema_prefix}.enrollments e ON m.module_id = e.module_id AND e.student_id = $1
+      -- Link to program modules and student programs instead of direct enrollments
+      JOIN ${schema_prefix}.program_modules pm ON m.module_id = pm.module_id
+      JOIN ${schema_prefix}.student_programs sp ON pm.program_id = sp.program_id AND sp.student_id = $1
+      -- Get any submissions for this student and assignment
       LEFT JOIN ${schema_prefix}.submissions s ON a.assignment_id = s.assignment_id AND s.student_id = $1
       LEFT JOIN ${schema_prefix}.assignment_grades ag ON s.submission_id = ag.submission_id
       ORDER BY a.due_date DESC
     `, [local_user_id]);
+    
+    console.log(`Found ${assignmentsResult.rows.length} assignments for student through program enrollment`);
+    
+    // Also check for any direct module enrollments (for backward compatibility)
+    const directEnrollmentsResult = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Direct module enrollments (assignments):', directEnrollmentsResult.rows[0].count);
     
     return res.status(200).json(assignmentsResult.rows);
   } catch (error) {

@@ -159,11 +159,57 @@ const ManageStudents: React.FC = () => {
   useEffect(() => {
     const fetchReferenceData = async () => {
       try {
-        // For now, using placeholder data until API methods are implemented
-        const programsData = [{ id: 'prog1', name: 'Computer Science', level: 'Undergraduate', duration: 4 }];
-        const nationalitiesData = [{ id: 'nat1', name: 'United Kingdom' }];
+        console.log('Fetching programs for department:', deptCode);
         
-        setPrograms(programsData);
+        // Get programs from the API
+        try {
+          // Get auth data from localStorage - this is how your app stores tokens
+          const authJson = localStorage.getItem('auth');
+          let token = '';
+          
+          if (authJson) {
+            try {
+              const authData = JSON.parse(authJson);
+              token = authData.token || '';
+              console.log('Using token from auth data');
+            } catch (e) {
+              console.error('Error parsing auth data:', e);
+            }
+          }
+          
+          const response = await fetch('/api/department/programs', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('API request made with auth token present:', !!token);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('API response for programs:', data);
+            
+            if (data && data.programs && Array.isArray(data.programs)) {
+              console.log('Successfully loaded programs:', data.programs);
+              setPrograms(data.programs);
+            } else {
+              console.warn('Unexpected programs data format from API:', data);
+              // Fallback to placeholder data if API doesn't return expected format
+              setPrograms([{ id: 'prog1', name: 'Computer Science', level: 'Undergraduate', duration: 4 }]);
+            }
+          } else {
+            console.warn('Failed to fetch programs, status:', response.status);
+            // Fallback to placeholder data
+            setPrograms([{ id: 'prog1', name: 'Computer Science', level: 'Undergraduate', duration: 4 }]);
+          }
+        } catch (fetchError) {
+          console.error('Error fetching programs:', fetchError);
+          // Fallback to placeholder data
+          setPrograms([{ id: 'prog1', name: 'Computer Science', level: 'Undergraduate', duration: 4 }]);
+        }
+        
+        // For now, still using placeholder data for nationalities
+        const nationalitiesData = [{ id: 'nat1', name: 'United Kingdom' }];
         setNationalities(nationalitiesData);
       } catch (error) {
         console.error('Error loading reference data:', error);
@@ -172,11 +218,15 @@ const ManageStudents: React.FC = () => {
           description: "Failed to load reference data", 
           variant: "destructive" 
         });
+        
+        // Ensure we have fallbacks
+        setPrograms([{ id: 'prog1', name: 'Computer Science', level: 'Undergraduate', duration: 4 }]);
+        setNationalities([{ id: 'nat1', name: 'United Kingdom' }]);
       }
     };
     
     fetchReferenceData();
-  }, [toast]);
+  }, [toast, deptCode]);
 
   const onSubmit: SubmitHandler<StudentFormValues> = async (data) => {
     setIsSubmitting(true);

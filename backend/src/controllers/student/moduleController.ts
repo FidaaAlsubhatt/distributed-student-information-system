@@ -62,42 +62,51 @@ export const getStudentModules = async (req: Request, res: Response) => {
       return res.status(503).json({ message: `${schema_prefix} database unavailable` });
     }
     
-    // First check if student exists and has enrollments
-    const enrollmentCheckResult = await deptPool.query(`
-      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    // First check if student exists and has enrollments in a program
+    const programEnrollmentCheck = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.student_programs WHERE student_id = $1
     `, [local_user_id]);
-    console.log('Student enrollments:', enrollmentCheckResult.rows[0].count);
+    console.log('Student program enrollments:', programEnrollmentCheck.rows[0].count);
     
-    // Get modules with UK terminology - match the actual database schema
+    // Get all modules associated with the student's program(s)
     const modulesResult = await deptPool.query(`
       SELECT 
         m.module_id::text, -- Convert to text for frontend compatibility
         m.code as module_code,
         m.title,
         'UK-based module' as description, -- Add default description
-        15 as credits, -- Default UK module credits
+        m.credits,
         CONCAT(EXTRACT(YEAR FROM s.start_date), '-', EXTRACT(YEAR FROM s.end_date)) as academic_year,
-        e.status,
-        CASE 
-          WHEN mg.grade IS NOT NULL THEN mg.grade::text
-          ELSE 'Not Graded' 
-        END as grade,
+        'enrolled' as status, -- Default status for program modules
+        'Not Graded' as grade, -- Default grade
         s.name as semester,
         stf.first_name || ' ' || stf.last_name as instructor
       FROM ${schema_prefix}.modules m
-      JOIN ${schema_prefix}.enrollments e ON m.module_id = e.module_id
+      -- Join to program_modules to get modules associated with the student's program
+      JOIN ${schema_prefix}.program_modules pm ON m.module_id = pm.module_id
+      -- Join to student_programs to filter for the current student
+      JOIN ${schema_prefix}.student_programs sp ON pm.program_id = sp.program_id AND sp.student_id = $1
+      -- Get semester data
       JOIN ${schema_prefix}.semesters s ON m.semester_id = s.semester_id
-      LEFT JOIN ${schema_prefix}.module_grades mg ON m.module_id = mg.module_id AND e.student_id = mg.student_id
-      -- Instructor data (assumed from first staff record for demo, would normally use a specific relation)
+      -- Check if the student has any grades for this module (left join in case no grades yet)
+      LEFT JOIN ${schema_prefix}.module_grades mg ON m.module_id = mg.module_id AND mg.student_id = $1
+      -- Instructor data (assumed from first staff record for demo)
       LEFT JOIN LATERAL (
         SELECT up.first_name, up.last_name
-        FROM ${schema_prefix}.staff st
+        FROM ${schema_prefix}.module_staff ms
+        JOIN ${schema_prefix}.staff st ON ms.staff_id = st.user_id
         JOIN ${schema_prefix}.user_profiles up ON st.user_id = up.user_id
+        WHERE ms.module_id = m.module_id
         LIMIT 1
       ) stf ON TRUE
-      WHERE e.student_id = $1
       ORDER BY s.start_date DESC
     `, [local_user_id]);
+    
+    // Also check for direct module enrollments for backward compatibility
+    const directEnrollmentsResult = await deptPool.query(`
+      SELECT COUNT(*) as count FROM ${schema_prefix}.enrollments WHERE student_id = $1
+    `, [local_user_id]);
+    console.log('Direct module enrollments:', directEnrollmentsResult.rows[0].count);
     
     console.log(`Found ${modulesResult.rows.length} modules for student in ${schema_prefix}`);
     
