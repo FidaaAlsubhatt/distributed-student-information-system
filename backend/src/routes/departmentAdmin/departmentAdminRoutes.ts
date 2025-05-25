@@ -6,6 +6,7 @@ import * as programController from '../../controllers/departmentAdmin/programCon
 import * as staffController from '../../controllers/departmentAdmin/manageStaffController';
 import * as studentController from '../../controllers/departmentAdmin/manageStudentController';
 import * as enrollmentController from '../../controllers/departmentAdmin/manageEnrolController';
+import * as moduleController from '../../controllers/departmentAdmin/manageModuleController';
 
 const router = Router();
 
@@ -60,11 +61,11 @@ router.delete('/staff/:id', staffController.deleteStaff);
 // GET /api/department/modules/:moduleId/staff - Get staff assigned to a module
 router.get('/modules/:moduleId/staff', staffController.getModuleStaff);
 
-// POST /api/department/modules/staff - Assign staff to a module
-router.post('/modules/staff', staffController.assignStaffToModule);
+// POST /api/department/modules/:moduleId/staff - Assign staff to a module
+router.post('/modules/:moduleId/staff', moduleController.assignStaffToModule);
 
 // DELETE /api/department/modules/:moduleId/staff/:staffId - Remove staff from a module
-router.delete('/modules/:moduleId/staff/:staffId', staffController.removeStaffFromModule);
+router.delete('/modules/:moduleId/staff/:staffId', moduleController.removeStaffFromModule);
 
 // Student management routes
 // GET /api/department/students - Get all students
@@ -98,5 +99,26 @@ router.get('/enrollment-requests', enrollmentController.getDepartmentEnrollmentR
 
 // Unified review endpoint
 router.post('/enrollment-requests/:id/review', enrollmentController.reviewEnrollmentRequest);
+
+// -----------------------------
+// Module Management Routes
+// -----------------------------
+
+
+// Add these routes in your departmentAdminRoutes.ts
+// GET /api/department/modules - Get all modules in the department
+router.get('/modules', moduleController.getDepartmentModules);
+
+// POST /api/department/modules - Create a new module
+router.post('/modules', moduleController.createModule);
+
+// PUT /api/department/modules/:moduleId - Update a module
+router.put('/modules/:moduleId', moduleController.updateModule);
+
+// DELETE /api/department/modules/:moduleId - Delete a module
+router.delete('/modules/:moduleId', moduleController.deleteModule);
+
+// GET /api/department/staff - Get all department staff for module assignment
+router.get('/staff', moduleController.getDepartmentStaff);
 
 export default router;

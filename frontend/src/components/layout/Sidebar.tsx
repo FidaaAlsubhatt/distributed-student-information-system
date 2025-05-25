@@ -85,7 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             icon: 'fa-solid fa-book',
             id: 'modules',
             children: [
-              { name: 'Manage Modules', id: '/manage-modules' },
+              { name: 'View Modules', id: '/view-modules' },
               { name: 'Edit Module Info', id: '/edit-module' },
             ],
           },
@@ -97,16 +97,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
               { name: 'Manage Assignments', id: '/manage-assignments' },
               { name: 'Grade Assignments', id: '/grade-assignments' },
               { name: 'Provide Feedback', id: '/provide-feedback' },
-            ],
-          },
-          {
-            name: 'Exams',
-            icon: 'fa-solid fa-file-alt',
-            id: 'exams',
-            children: [
-              { name: 'Manage Exams', id: '/manage-exams' },
-              { name: 'Schedule Exams', id: '/schedule-exams' },
-              { name: 'Update Exam Details', id: '/update-exams' },
             ],
           },
           {
@@ -136,8 +126,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             children: [
               { name: 'Manage Students', id: '/manage-students' },
               { name: 'Manage Staff', id: '/manage-staff' },
-              { name: 'Assign Roles', id: '/assign-roles' },
-              { name: 'Manage Dept Admins', id: '/manage-admins' },
             ],
           },
           {
@@ -258,6 +246,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             id: 'programs-enrollments',
             children: [
               { name: 'Manage Programs', id: '/manage-programs' },
+              { name: 'Manage Modules', id: '/manage-modules' },
               { name: 'Manage Enrollments', id: '/manage-enrollments' },
             ],
           },

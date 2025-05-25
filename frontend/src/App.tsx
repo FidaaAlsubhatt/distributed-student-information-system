@@ -23,7 +23,7 @@ import Messages from "@/pages/student/Messages";
 
 // Academic Staff Pages
 import AcademicDashboard from "@/pages/academic/Dashboard";
-import ManageModules from "@/pages/academic/ManageModules";
+import ViewModules from "@/pages/academic/ViewModules";
 import ManageAssignments from "@/pages/academic/ManageAssignments";
 import GradeAssignments from "@/pages/academic/GradeAssignments";
 import ViewStudents from "@/pages/academic/ViewStudents";
@@ -33,6 +33,7 @@ import DepartmentDashboard from "@/pages/department/Dashboard";
 import ManageStaff from "@/pages/department/ManageStaff";
 import ManageStudents from "@/pages/department/ManageStudents";
 import ManagePrograms from "@/pages/department/ManagePrograms";
+import ManageModules from "@/pages/department/ManageModules";
 import ManageEnrollments from "@/pages/department/ManageEnrollments";
 import DepartmentReports from "@/pages/department/Reports";
 import StudentCases from "@/pages/department/StudentCases";
@@ -88,8 +89,8 @@ function Router() {
       <Route path="/messages" component={Messages} />
       
       {/* Academic Staff routes */}
-      <Route path="/manage-modules" component={ManageModules} />
-      <Route path="/edit-module" component={ManageModules} />
+      <Route path="/view-modules" component={ViewModules} />
+      <Route path="/edit-module" component={ViewModules} />
       <Route path="/manage-assignments" component={ManageAssignments} />
       <Route path="/grade-assignments" component={GradeAssignments} />
       <Route path="/provide-feedback" component={GradeAssignments} />
@@ -100,6 +101,7 @@ function Router() {
       <Route path="/manage-staff" component={ManageStaff} />  
       <Route path="/manage-programs" component={ManagePrograms} />
       <Route path="/manage-enrollments" component={ManageEnrollments} />
+      <Route path="/manage-modules" component={ManageModules} />
       <Route path="/student-reports" component={DepartmentReports} />
       <Route path="/dept-performance" component={DepartmentReports} />
       <Route path="/suspension-records" component={StudentCases} />
