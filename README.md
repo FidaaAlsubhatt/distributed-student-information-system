@@ -1,93 +1,128 @@
-# Modular-Student-Information-System
+# Distributed Student Information System
 
+## Project Overview
 
+The Distributed Student Information System is a comprehensive educational management platform designed for universities with multiple academic departments. The system employs a distributed database architecture where each department maintains sovereign control over its data while sharing necessary information with central administration.
 
-## Getting started
+### Key Features
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- **Distributed Database Architecture**: Each department (CS, Mathematics) maintains its own database with schema isolation
+- **Foreign Data Wrapper (FDW) Integration**: Central administration has read-only federated access to departmental data
+- **Role-Based Access Control**: Four user roles with appropriate permissions (Student, Academic Staff, Department Admin, Central Admin)
+- **Cross-Department Enrollment**: Students can enroll in modules from other departments
+- **Academic Staff Portal**: Faculty can manage modules, assignments, grades, and student performance
+- **JWT Authentication**: Secure token-based authentication with role and department claims
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## System Architecture
 
-## Add your files
+- **Department Databases**:
+  - CS Department: PostgreSQL 14 | Database: cs_sis, Schema: cs_schema
+  - Math Department: PostgreSQL 14 | Database: math_sis, Schema: math_schema
+  
+- **Central Administration**:
+  - Global DB: PostgreSQL 14 | Database: global_sis, Schema: central, fdw_cs, fdw_math
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+- **Technology Stack**:
+  - Backend: Node.js + Express + TypeScript
+  - Frontend: React + TypeScript
+  - Database: PostgreSQL 14 with FDW extension
+  - Authentication: JWT
 
+## Setup Instructions
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Node.js (v14+)
+- npm or yarn
+- PostgreSQL client tools (optional, for direct DB access)
+
+### 1. Database Setup with Docker
+
+The system uses Docker to create three separate PostgreSQL instances for the distributed architecture:
+
+```bash
+# Navigate to the project root directory
+cd distributed-student-information-system
+
+# Start all database containers
+docker-compose -f docker/docker-compose.yml up -d
 ```
-cd existing_repo
-git remote add origin https://csgitlab.reading.ac.uk/zm014186/modular-student-information-system.git
-git branch -M main
-git push -uf origin main
+
+This will start three database containers:
+- cs_db (Computer Science Department)
+- math_db (Mathematics Department)
+- global_db (Central Administration)
+
+### 2. Database Schema and FDW Configuration
+
+After starting the containers, run the setup scripts to create schemas and configure Foreign Data Wrapper (FDW):
+
+```bash
+# Create schemas in each department database
+docker exec -it cs_db psql -U postgres -f /docker-entrypoint-initdb.d/01-init-schema.sql
+docker exec -it math_db psql -U postgres -f /docker-entrypoint-initdb.d/01-init-schema.sql
+
+# Create FDW users and permissions
+docker exec -it cs_db psql -U postgres -f /docker-entrypoint-initdb.d/02-fdw-users.sql
+docker exec -it math_db psql -U postgres -f /docker-entrypoint-initdb.d/02-fdw-users.sql
+
+# Configure FDW in the global database
+docker exec -it global_db psql -U postgres -f /docker-entrypoint-initdb.d/01-init-central.sql
+docker exec -it global_db psql -U postgres -f /docker-entrypoint-initdb.d/02-fdw-setup.sql
+docker exec -it global_db psql -U postgres -f /docker-entrypoint-initdb.d/03-global-modules-view.sql
 ```
 
-## Integrate with your tools
+### 4. Backend Setup
 
-- [ ] [Set up project integrations](https://csgitlab.reading.ac.uk/zm014186/modular-student-information-system/-/settings/integrations)
+```bash
+# Navigate to the backend directory
+cd backend
 
-## Collaborate with your team
+# Install dependencies
+npm install
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+# Create .env file (modify as needed)
+cp .env.example .env
 
-## Test and Deploy
+# Start the backend in development mode
+npm run dev
+```
 
-Use the built-in continuous integration in GitLab.
+The backend server will start on http://localhost:3001 by default.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+### 5. Frontend Setup
 
-***
+```bash
+# Navigate to the frontend directory
+cd frontend
 
-# Editing this README
+# Install dependencies
+npm install
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# Create .env file (modify as needed)
+cp .env.example .env
 
-## Suggestions for a good README
+# Start the frontend in development mode
+npm run dev
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+The React development server will start on http://localhost:3000.
 
-## Name
-Choose a self-explaining name for your project.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Troubleshooting
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Database Connection Issues
+- Check Docker container status: `docker ps`
+- Verify PostgreSQL is running: `docker logs cs_db` (or other container name)
+- Test connections: `psql -h localhost -p 5432 -U postgres -d cs_sis`
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+### FDW Configuration
+- Verify FDW extension: `SELECT * FROM pg_extension WHERE extname = 'postgres_fdw';`
+- Check server mappings: `SELECT * FROM pg_foreign_server;`
+- Test a federated query: `SELECT * FROM fdw_cs.modules LIMIT 5;`
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
