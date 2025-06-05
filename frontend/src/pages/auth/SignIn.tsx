@@ -127,7 +127,7 @@ export default function SignIn() {
             Don't have an account? Contact your administrator.
           </p>
           <div className="w-full border-t pt-4">
-            <p className="text-xs text-gray-400 mb-2">Demo Accounts:</p>
+            <p className="text-xs text-gray-400 mb-2">Admin Accounts:</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <p className="font-semibold">CS Department Admin:</p>

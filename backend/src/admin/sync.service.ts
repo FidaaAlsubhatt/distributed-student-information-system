@@ -2,7 +2,7 @@ import { pool } from '../db';
 import bcrypt from 'bcrypt';
 
 const SALT_ROUNDS = 10;
-const OVERWRITE_EXISTING_PASSWORDS = true;
+const OVERWRITE_EXISTING_PASSWORDS = false;
 
 export async function syncUsersFromDepartments() {
   console.log('🔁 Starting sync process...');
