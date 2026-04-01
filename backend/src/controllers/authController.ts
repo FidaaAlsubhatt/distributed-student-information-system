@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { pool, getDepartmentPool } from '../db'; 
+import { env } from '../config/env';
 
 interface User {
   user_id: string;
@@ -147,7 +148,7 @@ export const login = async (req: Request, res: Response) => {
         userId: user.user_id,
         email: user.email
       },
-      process.env.SESSION_SECRET || 'your-secret-key',
+      env.sessionSecret,
       { expiresIn: '24h' }
     );
 
@@ -188,7 +189,7 @@ export const verifyToken = async (req: Request, res: Response) => {
     }
 
     // Verify the token
-    const decoded = jwt.verify(token, process.env.SESSION_SECRET || 'your-secret-key') as { userId: string };
+    const decoded = jwt.verify(token, env.sessionSecret) as { userId: string };
     
     // Get user from database to ensure they still exist and are active
     const userResult = await pool.query(

@@ -1,6 +1,7 @@
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { pool } from '../db';
+import { env } from '../config/env';
 
 interface AuthenticatedTokenPayload extends JwtPayload {
   userId?: string | number;
@@ -31,7 +32,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
     const decoded = jwt.verify(
       token,
-      process.env.SESSION_SECRET!
+      env.sessionSecret
     ) as AuthenticatedTokenPayload | string;
 
     if (typeof decoded === 'string' || decoded.userId === undefined) {

@@ -1,38 +1,16 @@
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+import { env, type DbConfig } from './config/env';
 
 // Create a connection pool to the global database
-export const pool = new Pool({
-  host: process.env.GLOBAL_DB_HOST || 'localhost',
-  port: parseInt(process.env.GLOBAL_DB_PORT || '5435'),
-  database: process.env.GLOBAL_DB_NAME || 'global_sis',
-  user: process.env.GLOBAL_DB_USER || 'admin',
-  password: process.env.GLOBAL_DB_PASSWORD || 'adminpass',
-});
+export const pool = new Pool(env.globalDb);
 
 // Cache for department-specific connection pools
 const departmentPoolCache = new Map<string, Pool>();
 
 // Map schema_prefix values to department database connection details
-const departmentConfigs: Record<string, any> = {
-  'cs_schema': {
-    host: process.env.CS_DB_HOST || 'localhost',
-    port: parseInt(process.env.CS_DB_PORT || '5433'),
-    database: process.env.CS_DB_NAME || 'cs_sis',
-    user: process.env.CS_DB_USER || 'cs_admin',
-    password: process.env.CS_DB_PASSWORD || 'cspass',
-  },
-  'math_schema': {
-    host: process.env.MATH_DB_HOST || 'localhost',
-    port: parseInt(process.env.MATH_DB_PORT || '5434'),
-    database: process.env.MATH_DB_NAME || 'math_sis',
-    user: process.env.MATH_DB_USER || 'math_admin',
-    password: process.env.MATH_DB_PASSWORD || 'mathpass',
-  }
+const departmentConfigs: Record<'cs_schema' | 'math_schema', DbConfig> = {
+  cs_schema: env.departmentDbs.cs_schema,
+  math_schema: env.departmentDbs.math_schema,
 };
 
 // Create a function to get a department-specific connection pool
@@ -55,7 +33,7 @@ export const getDepartmentPool = async (schemaPrefix: string): Promise<Pool> => 
     }
 
     // Get the department configuration from our static map
-    const deptConfig = departmentConfigs[schemaPrefix];
+    const deptConfig = departmentConfigs[schemaPrefix as keyof typeof departmentConfigs];
     if (!deptConfig) {
       throw new Error(`Connection configuration not found for schema: ${schemaPrefix}`);
     }
