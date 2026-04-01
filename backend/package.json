@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "start": "tsc && node dist/index.js",
-    "seed": "ts-node src/scripts/seed-admin.ts"
+    "seed": "ts-node src/scripts/seed-admin.ts",
+    "test:access": "node -r ts-node/register --test src/test/access-control.test.ts"
   },
   "keywords": [],
   "author": "",

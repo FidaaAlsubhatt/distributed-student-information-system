@@ -1,19 +1,22 @@
 // src/routes/user.routes.ts
 import express from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../middleware/auth.middleware';
 import { getUsers, getDepartments, createUser, getDepartmentUsers, deleteUserInDepartment, addStudent, addAcademicStaff } from '../controllers/userController';
 
 const router = express.Router();
 
-// User routes
-router.get('/users', authenticate, getUsers);
-router.post('/users', authenticate, createUser);
-router.get('/departments', authenticate, getDepartments);
+router.use(authenticate);
+router.use(authorizeRoles('central_admin'));
+
+// Legacy central administration routes
+router.get('/users', getUsers);
+router.post('/users', createUser);
+router.get('/departments', getDepartments);
 
 // Department-specific routes
-router.get('/department/users', authenticate, getDepartmentUsers);
-router.delete('/users/:userId', authenticate, deleteUserInDepartment);
-router.post('/students', authenticate, addStudent);
-router.post('/academic-staff', authenticate, addAcademicStaff);
+router.get('/department/users', getDepartmentUsers);
+router.delete('/users/:userId', deleteUserInDepartment);
+router.post('/students', addStudent);
+router.post('/academic-staff', addAcademicStaff);
 
 export default router;
