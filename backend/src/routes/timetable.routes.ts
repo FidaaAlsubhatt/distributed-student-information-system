@@ -1,11 +1,11 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../middleware/auth.middleware';
 import { getStudentClassTimetable, getStudentExamTimetable } from '../controllers/student/timetableController';
 
 const router = express.Router();
 
 // Routes require authentication
-router.get('/classes', authenticate, getStudentClassTimetable);
-router.get('/exams', authenticate, getStudentExamTimetable);
+router.get('/classes', authenticate, authorizeRoles('student'), getStudentClassTimetable);
+router.get('/exams', authenticate, authorizeRoles('student'), getStudentExamTimetable);
 
 export default router;

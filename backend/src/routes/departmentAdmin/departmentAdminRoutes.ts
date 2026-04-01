@@ -1,6 +1,6 @@
 // src/routes/departmentAdmin/departmentAdminRoutes.ts
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../../middleware/auth.middleware';
 import * as userController from '../../controllers/departmentAdmin/userController';
 import * as programController from '../../controllers/departmentAdmin/programController';
 import * as staffController from '../../controllers/departmentAdmin/manageStaffController';
@@ -12,6 +12,7 @@ const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
+router.use(authorizeRoles('department_admin'));
 
 // Department admin user management routes
 // GET    /api/department/users/student - Get all students in the department

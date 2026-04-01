@@ -34,11 +34,6 @@ export const options = {
 // Test users including template accounts and regular accounts
 // These match the template accounts in your system
 const users = [
-  // Template accounts with special password handling
-  { email: 'admin@university.ac.uk', password: 'password123', valid: true, type: 'template' },
-  { email: 'department@university.ac.uk', password: 'password123', valid: true, type: 'template' },
-  { email: 'math.Admin@university.ac.uk', password: 'password123', valid: true, type: 'template' },
-  
   // Admin accounts
   { email: 'cs.admin@university.ac.uk', password: 'fidaa123', valid: true, type: 'admin' },
   { email: 'math.admin@university.ac.uk', password: 'fidaa123', valid: true, type: 'admin' },
@@ -50,9 +45,7 @@ const users = [
   
   // Staff accounts
   { email: 'elizabeth.johnson@cs.university.ac.uk', password: '19680324', valid: true, type: 'staff' },
-  { email: 'jonathan.phillips@math.university.ac.uk', password: '19700412', valid: true, type: 'staff' },
-  { email: 'student1@example.com', password: 'testpassword3', valid: true, type: 'regular' },
-  
+  { email: 'jonathan.phillips@math.university.ac.uk', password: '19700412', valid: true, type: 'staff' },  
   // Invalid credentials to test error handling
   { email: 'notfound@example.com', password: 'wrongpass', valid: false, type: 'invalid' },
   { email: 'inactive@example.com', password: 'inactivepass', valid: false, type: 'invalid' },
@@ -123,6 +116,11 @@ export default function() {
       });
     
     loginFailRate.add(!loginSuccess);
+
+    if (!loginSuccess && user.valid) {
+      console.error(`Valid login failed for: ${user.email}, status: ${loginRes.status}`);
+      console.error(`Response body: ${loginRes.body}`);
+    }    
     
     if (loginSuccess && user.valid) {
       successfulLogins.add(1);

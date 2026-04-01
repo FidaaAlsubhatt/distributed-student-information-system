@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { api, DepartmentRole, UserData } from '../lib/api';
-import { useLocation } from 'wouter';
 
 interface User {
   id: string;
@@ -17,6 +16,7 @@ interface User {
 interface UserContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
+  authReady: boolean;
   availableRoles: string[];
   activeRole: string | null;
   availableDepartments: DepartmentRole[];
@@ -30,11 +30,11 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [, setLocation] = useLocation();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [activeDepartment, setActiveDepartment] = useState<DepartmentRole | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [availableDepartments, setAvailableDepartments] = useState<DepartmentRole[]>([]);
 
@@ -75,7 +75,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (error) {
         console.error('Failed to parse stored auth data:', error);
         localStorage.removeItem('auth');
+      } finally {
+        setAuthReady(true);
       }
+    } else {
+      setAuthReady(true);
     }
   }, []);
 
@@ -152,6 +156,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         activeRole,
         activeDepartment,
         isAuthenticated,
+        authReady,
         login,
         logout,
         setActiveRole,

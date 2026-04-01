@@ -1,12 +1,13 @@
 // src/routes/centralAdmin/centralAdminRoutes.ts
 import { Router } from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../../middleware/auth.middleware';
 import * as reportsController from '../../controllers/centralAdmin/reportsController';
 
 const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
+router.use(authorizeRoles('central_admin'));
 
 // Central admin reporting routes - accessing FDW views
 // GET /api/central/student_directory - Get all students across departments

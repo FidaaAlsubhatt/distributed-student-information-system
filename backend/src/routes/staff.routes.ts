@@ -1,24 +1,27 @@
 import { Router } from 'express';
 import { getAcademicModules, getModuleStudents, updateStudentGrade, deleteModule, updateModule, createModule } from '../controllers/staff/moduleController';
 import { getAssignments, getAssignmentSubmissions, createAssignment, updateAssignment, deleteAssignment, updateSubmissionGrade } from '../controllers/staff/assignmentController';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../middleware/auth.middleware';
 
 const router = Router();
 
+router.use(authenticate);
+router.use(authorizeRoles('academic_staff'));
+
 // Routes for academic staff modules
-router.get('/modules', authenticate, getAcademicModules);
-router.post('/modules', authenticate, createModule);
-router.put('/modules/:moduleId', authenticate, updateModule);
-router.delete('/modules/:moduleId', authenticate, deleteModule);
-router.get('/modules/:moduleId/students', authenticate, getModuleStudents);
-router.put('/modules/:moduleId/students/:studentId/assignments/:assignmentId/grade', authenticate, updateStudentGrade);
+router.get('/modules', getAcademicModules);
+router.post('/modules', createModule);
+router.put('/modules/:moduleId', updateModule);
+router.delete('/modules/:moduleId', deleteModule);
+router.get('/modules/:moduleId/students', getModuleStudents);
+router.put('/modules/:moduleId/students/:studentId/assignments/:assignmentId/grade', updateStudentGrade);
 
 // Routes for academic staff assignments
-router.get('/assignments', authenticate, getAssignments);
-router.post('/assignments', authenticate, createAssignment);
-router.get('/assignments/:assignmentId/submissions', authenticate, getAssignmentSubmissions);
-router.put('/assignments/:assignmentId', authenticate, updateAssignment);
-router.delete('/assignments/:assignmentId', authenticate, deleteAssignment);
-router.put('/assignments/:assignmentId/students/:studentId/grade', authenticate, updateSubmissionGrade);
+router.get('/assignments', getAssignments);
+router.post('/assignments', createAssignment);
+router.get('/assignments/:assignmentId/submissions', getAssignmentSubmissions);
+router.put('/assignments/:assignmentId', updateAssignment);
+router.delete('/assignments/:assignmentId', deleteAssignment);
+router.put('/assignments/:assignmentId/students/:studentId/grade', updateSubmissionGrade);
 
 export default router;

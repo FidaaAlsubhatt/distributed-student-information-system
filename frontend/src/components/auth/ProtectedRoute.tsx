@@ -7,36 +7,48 @@ interface ProtectedRouteProps {
   requiredRole?: 'student' | 'academic_staff' | 'department_admin' | 'central_admin';
 }
 
+const DASHBOARD_PATHS = {
+  student: '/student/dashboard',
+  academic_staff: '/academic/dashboard',
+  department_admin: '/department/dashboard',
+  central_admin: '/central/dashboard',
+} as const;
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requiredRole 
 }) => {
-  const { isAuthenticated, activeRole } = useUser();
+  const { authReady, isAuthenticated, activeRole } = useUser();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    console.log('ProtectedRoute check - isAuthenticated:', isAuthenticated, 'activeRole:', activeRole);
-    
-    // If not authenticated, redirect to login
+    if (!authReady) {
+      return;
+    }
+
     if (!isAuthenticated) {
-      console.log('Not authenticated, redirecting to login');
       setLocation('/');
       return;
     }
 
-    // If a specific role is required, check if user has it
-    // This is commented out to allow users to access dashboards of any role
-    /*
     if (requiredRole && activeRole !== requiredRole) {
-      console.log(`Role mismatch: required ${requiredRole}, active ${activeRole}`);
-      // Redirect to the dashboard for their current role
-      setLocation(`/${activeRole}/dashboard`);
+      if (activeRole && activeRole in DASHBOARD_PATHS) {
+        setLocation(DASHBOARD_PATHS[activeRole as keyof typeof DASHBOARD_PATHS]);
+      } else {
+        setLocation('/');
+      }
     }
-    */
-  }, [isAuthenticated, activeRole, requiredRole, setLocation]);
+  }, [authReady, isAuthenticated, activeRole, requiredRole, setLocation]);
 
-  // If authenticated and has required role (or no specific role required), render children
-  return isAuthenticated ? <>{children}</> : null;
+  if (!authReady || !isAuthenticated) {
+    return null;
+  }
+
+  if (requiredRole && activeRole !== requiredRole) {
+    return null;
+  }
+
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

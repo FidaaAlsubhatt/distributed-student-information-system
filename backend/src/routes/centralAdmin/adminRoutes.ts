@@ -1,6 +1,6 @@
 // src/routes/centralAdmin/adminRoutes.ts
 import express from 'express';
-import { authenticate } from '../../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../../middleware/auth.middleware';
 import { 
   createAdmin, 
   getAdmins, 
@@ -13,6 +13,7 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
+router.use(authorizeRoles('central_admin'));
 
 // Admin management routes
 router.post('/', createAdmin);

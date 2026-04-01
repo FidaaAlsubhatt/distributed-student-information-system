@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -46,6 +47,23 @@ import DepartmentManagement from "@/pages/central/DepartmentManagement";
 import InstitutionReports from "@/pages/central/InstitutionReports";
 import SecurityMonitoring from "@/pages/central/SecurityMonitoring";
 
+type AppRole = "student" | "academic_staff" | "department_admin" | "central_admin";
+
+interface ProtectedPageRouteProps {
+  path: string;
+  role: AppRole;
+  component: ComponentType;
+}
+
+function ProtectedPageRoute({ path, role, component: Component }: ProtectedPageRouteProps) {
+  return (
+    <Route path={path}>
+      <ProtectedRoute requiredRole={role}>
+        <Component />
+      </ProtectedRoute>
+    </Route>
+  );
+}
 
 function Router() {
   return (
@@ -54,71 +72,55 @@ function Router() {
       <Route path="/" component={SignIn} />
       
       {/* Role-specific dashboard routes */}
-      <Route path="/student/dashboard">
-        <ProtectedRoute requiredRole="student">
-          <StudentDashboard />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/academic/dashboard">
-        <ProtectedRoute requiredRole="academic_staff">
-          <AcademicDashboard />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/department/dashboard">
-        <ProtectedRoute requiredRole="department_admin">
-          <DepartmentDashboard />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/central/dashboard">
-        <ProtectedRoute requiredRole="central_admin">
-          <CentralDashboard />
-        </ProtectedRoute>
-      </Route>
+      <ProtectedPageRoute path="/student/dashboard" role="student" component={StudentDashboard} />
+      <ProtectedPageRoute path="/academic/dashboard" role="academic_staff" component={AcademicDashboard} />
+      <ProtectedPageRoute path="/department/dashboard" role="department_admin" component={DepartmentDashboard} />
+      <ProtectedPageRoute path="/central/dashboard" role="central_admin" component={CentralDashboard} />
       
       {/* Student routes */}
-      <Route path="/modules" component={Modules} />
-      <Route path="/request-enrollment" component={RequestEnrollment} />
-      <Route path="/request-drop" component={RequestDrop} />
-      <Route path="/assignments" component={ViewAssignments} />
-      <Route path="/submit-assignment" component={SubmitAssignment} />
-      <Route path="/grades" component={ViewGrades} />
-      <Route path="/class-timetable" component={Timetable} />
-      <Route path="/exam-timetable" component={Timetable} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/notifications" component={Notifications} />
-      <Route path="/messages" component={Messages} />
+      <ProtectedPageRoute path="/modules" role="student" component={Modules} />
+      <ProtectedPageRoute path="/request-enrollment" role="student" component={RequestEnrollment} />
+      <ProtectedPageRoute path="/request-drop" role="student" component={RequestDrop} />
+      <ProtectedPageRoute path="/assignments" role="student" component={ViewAssignments} />
+      <ProtectedPageRoute path="/submit-assignment" role="student" component={SubmitAssignment} />
+      <ProtectedPageRoute path="/grades" role="student" component={ViewGrades} />
+      <ProtectedPageRoute path="/class-timetable" role="student" component={Timetable} />
+      <ProtectedPageRoute path="/exam-timetable" role="student" component={Timetable} />
+      <ProtectedPageRoute path="/profile" role="student" component={Profile} />
+      <ProtectedPageRoute path="/notifications" role="student" component={Notifications} />
+      <ProtectedPageRoute path="/messages" role="student" component={Messages} />
       
       {/* Academic Staff routes */}
-      <Route path="/view-modules" component={ViewModules} />
-      <Route path="/edit-module" component={ViewModules} />
-      <Route path="/manage-assignments" component={ManageAssignments} />
-      <Route path="/grade-assignments" component={GradeAssignments} />
-      <Route path="/provide-feedback" component={GradeAssignments} />
-      <Route path="/view-students" component={ViewStudents} />
+      <ProtectedPageRoute path="/view-modules" role="academic_staff" component={ViewModules} />
+      <ProtectedPageRoute path="/edit-module" role="academic_staff" component={ViewModules} />
+      <ProtectedPageRoute path="/manage-assignments" role="academic_staff" component={ManageAssignments} />
+      <ProtectedPageRoute path="/grade-assignments" role="academic_staff" component={GradeAssignments} />
+      <ProtectedPageRoute path="/provide-feedback" role="academic_staff" component={GradeAssignments} />
+      <ProtectedPageRoute path="/view-students" role="academic_staff" component={ViewStudents} />
       
       {/* Department Admin routes */}
-      <Route path="/manage-students" component={ManageStudents} />
-      <Route path="/manage-staff" component={ManageStaff} />  
-      <Route path="/manage-programs" component={ManagePrograms} />
-      <Route path="/manage-enrollments" component={ManageEnrollments} />
-      <Route path="/manage-modules" component={ManageModules} />
-      <Route path="/student-reports" component={DepartmentReports} />
-      <Route path="/dept-performance" component={DepartmentReports} />
-      <Route path="/suspension-records" component={StudentCases} />
-      <Route path="/student-performance" component={StudentCases} />
-      <Route path="/exams" component={DepartmentExams} />
-      <Route path="/classes" component={DepartmentClasses} />
+      <ProtectedPageRoute path="/manage-students" role="department_admin" component={ManageStudents} />
+      <ProtectedPageRoute path="/manage-staff" role="department_admin" component={ManageStaff} />
+      <ProtectedPageRoute path="/manage-programs" role="department_admin" component={ManagePrograms} />
+      <ProtectedPageRoute path="/manage-enrollments" role="department_admin" component={ManageEnrollments} />
+      <ProtectedPageRoute path="/manage-modules" role="department_admin" component={ManageModules} />
+      <ProtectedPageRoute path="/student-reports" role="department_admin" component={DepartmentReports} />
+      <ProtectedPageRoute path="/dept-performance" role="department_admin" component={DepartmentReports} />
+      <ProtectedPageRoute path="/suspension-records" role="department_admin" component={StudentCases} />
+      <ProtectedPageRoute path="/student-performance" role="department_admin" component={StudentCases} />
+      <ProtectedPageRoute path="/exams" role="department_admin" component={DepartmentExams} />
+      <ProtectedPageRoute path="/classes" role="department_admin" component={DepartmentClasses} />
       
       {/* Central Admin routes */}
-      <Route path="/manage-dept-admins" component={DepartmentManagement} />
-      <Route path="/user-access" component={DepartmentManagement} />
-      <Route path="/student-data" component={DepartmentManagement} />
-      <Route path="/institution-reports" component={InstitutionReports} />
-      <Route path="/cross-dept-performance" component={InstitutionReports} />
-      <Route path="/system-logs" component={SecurityMonitoring} />
-      <Route path="/login-attempts" component={SecurityMonitoring} />
-      <Route path="/audit-trail" component={SecurityMonitoring} />
-      <Route path="/role-permissions" component={SecurityMonitoring} />
+      <ProtectedPageRoute path="/manage-dept-admins" role="central_admin" component={DepartmentManagement} />
+      <ProtectedPageRoute path="/user-access" role="central_admin" component={DepartmentManagement} />
+      <ProtectedPageRoute path="/student-data" role="central_admin" component={DepartmentManagement} />
+      <ProtectedPageRoute path="/institution-reports" role="central_admin" component={InstitutionReports} />
+      <ProtectedPageRoute path="/cross-dept-performance" role="central_admin" component={InstitutionReports} />
+      <ProtectedPageRoute path="/system-logs" role="central_admin" component={SecurityMonitoring} />
+      <ProtectedPageRoute path="/login-attempts" role="central_admin" component={SecurityMonitoring} />
+      <ProtectedPageRoute path="/audit-trail" role="central_admin" component={SecurityMonitoring} />
+      <ProtectedPageRoute path="/role-permissions" role="central_admin" component={SecurityMonitoring} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

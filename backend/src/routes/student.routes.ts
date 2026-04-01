@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorizeRoles } from '../middleware/auth.middleware';
 import * as profileController from '../controllers/student/profileController';
 import * as assignmentController from '../controllers/student/assignmentController';
 import * as timetableController from '../controllers/student/timetableController';
@@ -9,6 +9,7 @@ const router = express.Router();
 
 // Apply JWT authentication middleware to all student routes
 router.use(authenticate);
+router.use(authorizeRoles('student'));
 
 // Profile routes
 router.get('/profile', profileController.getStudentProfile);

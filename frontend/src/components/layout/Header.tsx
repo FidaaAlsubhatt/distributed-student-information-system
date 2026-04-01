@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 
 interface HeaderProps {
   toggleSidebar: () => void;
